@@ -1,0 +1,350 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import {
+  Music, Zap, Lightbulb, Star, ArrowRight,
+  Sparkles, Tag, Piano, Loader2,
+} from "lucide-react";
+import clsx from "clsx";
+import PianoView, { ChordData } from "@/components/PianoView";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface Analysis {
+  key: string;
+  mode: string;
+  key_display: string;
+  bpm: number;
+  duration_seconds: number;
+  chords: string[];
+  chord_sequence: string[];
+  feel: { tone: string; dynamic: string; texture: string; brightness_score: number };
+  playing_style: string;
+}
+
+interface Feedback {
+  current_stage: string;
+  what_is_working: string;
+  what_is_missing: string;
+  next_step: string;
+  next_step_detail: string;
+  optional_step: string;
+  why_it_works: string;
+  genre_suggestions: string[];
+  mood_tags: string[];
+  producer_note: string;
+}
+
+interface Props {
+  analysis: Analysis;
+  feedback: Feedback;
+}
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+// ─── Mood colour helper ───────────────────────────────────────────────────────
+
+const MOOD_COLORS: Record<string, string> = {
+  default: "bg-brand-500/15 text-brand-300 border-brand-500/30",
+  warm:    "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  dark:    "bg-purple-500/15 text-purple-300 border-purple-500/30",
+  bright:  "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
+  chill:   "bg-green-500/15 text-green-300 border-green-500/30",
+};
+function moodColor(tag: string) {
+  const t = tag.toLowerCase();
+  if (t.includes("warm") || t.includes("mellow")) return MOOD_COLORS.warm;
+  if (t.includes("dark") || t.includes("moody"))  return MOOD_COLORS.dark;
+  if (t.includes("bright") || t.includes("uplift")) return MOOD_COLORS.bright;
+  if (t.includes("chill") || t.includes("relax"))  return MOOD_COLORS.chill;
+  return MOOD_COLORS.default;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+  return (
+    <div className="bg-surface-2 rounded-xl p-4 border border-surface-border">
+      <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">{label}</p>
+      <p className="text-2xl font-bold text-white leading-none">{value}</p>
+      {sub && <p className="text-xs text-gray-500 mt-0.5 capitalize">{sub}</p>}
+    </div>
+  );
+}
+
+function Card({
+  icon: Icon,
+  title,
+  iconBg,
+  children,
+  className,
+}: {
+  icon: React.ElementType;
+  title: string;
+  iconBg: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={clsx("bg-surface-2 rounded-2xl p-5 border border-surface-border", className)}>
+      <div className="flex items-center gap-2.5 mb-4">
+        <div className={clsx("p-1.5 rounded-lg", iconBg)}>
+          <Icon size={16} className="text-white" />
+        </div>
+        <h3 className="font-semibold text-gray-200 text-sm">{title}</h3>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function AnalysisResult({ analysis, feedback }: Props) {
+  const [pianoData, setPianoData] = useState<ChordData[] | null>(null);
+  const [pianoLoading, setPianoLoading] = useState(false);
+  const [pianoError, setPianoError] = useState<string | null>(null);
+  const [showPiano, setShowPiano] = useState(false);
+
+  const fmt = (s: number) =>
+    s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
+
+  const [styleMain, styleSub] = analysis.playing_style.split("/");
+
+  const handleViewOnPiano = useCallback(async () => {
+    if (pianoData) {
+      setShowPiano((v) => !v);
+      return;
+    }
+    setPianoLoading(true);
+    setPianoError(null);
+    try {
+      const res = await fetch(`${API_URL}/piano-chords`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chords: analysis.chords,
+          key: analysis.key,
+          mode: analysis.mode,
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to load piano data");
+      const data = await res.json();
+      setPianoData(data.chord_data);
+      setShowPiano(true);
+    } catch (e: any) {
+      setPianoError("Could not load piano view — is the backend running?");
+    } finally {
+      setPianoLoading(false);
+    }
+  }, [pianoData, analysis]);
+
+  return (
+    <div className="space-y-4">
+
+      {/* ── Row 1: Stats ── */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <StatCard label="Key"      value={analysis.key}   sub={analysis.mode} />
+        <StatCard label="Tempo"    value={`${analysis.bpm}`} sub="BPM" />
+        <StatCard label="Duration" value={fmt(analysis.duration_seconds)} />
+        <StatCard label="Style"    value={styleMain}      sub={styleSub} />
+      </div>
+
+      {/* ── Row 2: 2-column main layout ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 items-start">
+
+        {/* ── Left column ── */}
+        <div className="space-y-4">
+
+          {/* Chord Progression */}
+          <Card icon={Music} title="Chord Progression" iconBg="bg-brand-600">
+            <div className="mb-3">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Order Played</p>
+              <div className="flex flex-wrap gap-2">
+                {(analysis.chord_sequence ?? analysis.chords).map((chord, i) => (
+                  <span key={i} className="chord-pill">{chord}</span>
+                ))}
+              </div>
+            </div>
+            <div className="border-t border-surface-border pt-3 mb-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Unique Chords</p>
+              <div className="flex flex-wrap gap-2">
+                {analysis.chords.map((chord, i) => (
+                  <span key={i} className="chord-pill">{chord}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* View on Piano button */}
+            <button
+              onClick={handleViewOnPiano}
+              disabled={pianoLoading}
+              className={clsx(
+                "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all",
+                showPiano && pianoData
+                  ? "bg-brand-600/30 text-brand-300 border-brand-500/50"
+                  : "bg-surface-3 text-gray-400 border-surface-border hover:text-brand-300 hover:border-brand-500/40 hover:bg-brand-500/10"
+              )}
+            >
+              {pianoLoading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Piano size={14} />
+              )}
+              {pianoLoading
+                ? "Loading piano..."
+                : showPiano && pianoData
+                ? "Hide Piano"
+                : "View on Piano"}
+            </button>
+
+            {pianoError && (
+              <p className="text-xs text-red-400 mt-2">{pianoError}</p>
+            )}
+          </Card>
+
+          {/* Sonic Feel */}
+          <Card icon={Sparkles} title="Sonic Feel" iconBg="bg-purple-600">
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { label: "Tone",    val: analysis.feel.tone },
+                { label: "Dynamic", val: analysis.feel.dynamic },
+                { label: "Texture", val: analysis.feel.texture },
+              ].map(({ label, val }) => (
+                <div key={label} className="bg-surface-3 rounded-xl p-3 text-center">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{label}</p>
+                  <p className="text-sm font-semibold text-gray-200 capitalize">{val}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Brightness bar */}
+            <div className="mt-3">
+              <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                <span>Dark</span>
+                <span>Bright</span>
+              </div>
+              <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-brand-600 to-cyan-400 transition-all"
+                  style={{ width: `${analysis.feel.brightness_score * 100}%` }}
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* ── Right column ── */}
+        <div className="space-y-4">
+
+          {/* Stage badge */}
+          <div className="flex items-start gap-3 bg-surface-2 rounded-2xl p-5 border border-surface-border">
+            <div className="p-1.5 bg-gradient-to-br from-brand-600 to-accent-purple rounded-lg shrink-0">
+              <Zap size={16} className="text-white" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Current Stage</p>
+              <p className="text-sm font-semibold text-gray-200">{feedback.current_stage}</p>
+            </div>
+          </div>
+
+          {/* What's working */}
+          <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
+            <div className="flex items-center gap-2 mb-3">
+              <Star size={14} className="text-green-400 shrink-0" />
+              <p className="text-[10px] font-semibold text-green-400 uppercase tracking-widest">What's Working</p>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">{feedback.what_is_working}</p>
+          </div>
+
+          {/* What's missing */}
+          <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
+            <div className="flex items-center gap-2 mb-3">
+              <ArrowRight size={14} className="text-amber-400 shrink-0" />
+              <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest">What's Missing</p>
+            </div>
+            <p className="text-gray-300 text-sm leading-relaxed">{feedback.what_is_missing}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Piano View (full width, conditional) ── */}
+      {showPiano && pianoData && (
+        <PianoView
+          chordData={pianoData}
+          bpm={analysis.bpm}
+          onClose={() => setShowPiano(false)}
+        />
+      )}
+
+      {/* ── Next Step hero (full width) ── */}
+      <div className="gradient-border">
+        <div className="bg-surface-1 rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <div className="p-1.5 bg-gradient-to-br from-brand-500 to-accent-purple rounded-lg">
+              <Lightbulb size={15} className="text-white" />
+            </div>
+            <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400">Next Step</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <p className="text-xl font-bold text-white mb-3">{feedback.next_step}</p>
+              <p className="text-gray-400 text-sm leading-relaxed">{feedback.next_step_detail}</p>
+            </div>
+            {feedback.optional_step && (
+              <div className="border-t md:border-t-0 md:border-l border-surface-border pt-4 md:pt-0 md:pl-6">
+                <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Also Consider</p>
+                <p className="text-gray-300 text-sm leading-relaxed">{feedback.optional_step}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Row 3: Genre / Mood / Why — 3 columns ── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+        {/* Genre */}
+        <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Genre Directions</p>
+          <div className="flex flex-wrap gap-1.5">
+            {feedback.genre_suggestions?.map((g) => (
+              <span key={g} className="text-xs bg-surface-3 border border-surface-border text-gray-300 rounded-lg px-2.5 py-1">
+                {g}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Mood */}
+        <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
+          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+            <Tag size={10} /> Mood Tags
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {feedback.mood_tags?.map((m) => (
+              <span key={m} className={clsx("text-xs border rounded-lg px-2.5 py-1", moodColor(m))}>
+                {m}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        {/* Why it works */}
+        <Card icon={Lightbulb} title="Why It Works" iconBg="bg-cyan-600">
+          <p className="text-gray-400 text-xs leading-relaxed">{feedback.why_it_works}</p>
+        </Card>
+      </div>
+
+      {/* ── Producer note ── */}
+      <div className="bg-gradient-to-r from-brand-900/30 to-accent-purple/10 rounded-2xl p-5 border border-brand-800/30">
+        <div className="flex gap-3">
+          <span className="text-2xl shrink-0">🎸</span>
+          <p className="text-gray-300 text-sm leading-relaxed italic">{feedback.producer_note}</p>
+        </div>
+      </div>
+
+    </div>
+  );
+}

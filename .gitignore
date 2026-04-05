@@ -1,0 +1,38 @@
+# Environment
+.env
+.env.*
+!.env.local.example
+!.env.example
+
+# Next.js
+.next/
+out/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Logs
+*.log
+logs/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
