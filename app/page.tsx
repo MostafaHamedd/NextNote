@@ -100,7 +100,7 @@ export default function Home() {
         <div className="max-w-2xl mx-auto text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-4 py-1.5 mb-6">
             <Zap size={14} className="text-brand-400" />
-            <span className="text-sm font-medium text-brand-300">Powered by GPT-3.5-turbo</span>
+            <span className="text-sm font-medium text-brand-300">Powered by GPT-4o</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">

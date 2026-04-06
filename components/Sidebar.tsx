@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { PlusCircle, BarChart2, Clock, Settings, Zap } from "lucide-react";
+import { PlusCircle, Music, Clock, Settings, Zap } from "lucide-react";
 import { useState } from "react";
 import clsx from "clsx";
 import HistorySidebar from "@/components/HistorySidebar";
@@ -54,13 +54,18 @@ export default function Sidebar() {
             New Analysis
           </Link>
 
-          <button
-            disabled
-            className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium text-gray-600 cursor-not-allowed"
+          <Link
+            href="/sheet"
+            className={clsx(
+              "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
+              pathname === "/sheet" || pathname === "/sheet/play"
+                ? "bg-brand-600 text-white"
+                : "text-gray-400 hover:text-white hover:bg-surface-3"
+            )}
           >
-            <BarChart2 size={15} />
-            Library
-          </button>
+            <Music size={15} />
+            Sheet Music
+          </Link>
 
           <button
             onClick={() => setShowHistory(true)}

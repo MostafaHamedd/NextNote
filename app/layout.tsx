@@ -14,10 +14,10 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="flex min-h-screen bg-surface">
+      <body className="flex min-h-screen bg-surface overflow-x-hidden">
         <Sidebar />
         {/* Main content — offset by the fixed 176px (w-44) sidebar */}
-        <div className="flex-1 ml-44">{children}</div>
+        <div className="flex-1 ml-44 min-w-0 overflow-x-hidden">{children}</div>
       </body>
     </html>
   );
