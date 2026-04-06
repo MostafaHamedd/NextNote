@@ -150,13 +150,43 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         <StatCard label="Style"    value={styleMain}      sub={styleSub} />
       </div>
 
-      {/* ── Row 2: 2-column main layout ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-4 items-start">
+      {/* ── Row 2: 3-column layout ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] gap-4 items-start">
 
-        {/* ── Left column ── */}
+        {/* ── Left column: Sonic Feel ── */}
         <div className="space-y-4">
+          <Card icon={Sparkles} title="Sonic Feel" iconBg="bg-purple-600">
+            <div className="grid grid-cols-1 gap-2">
+              {[
+                { label: "Tone",    val: analysis.feel.tone },
+                { label: "Dynamic", val: analysis.feel.dynamic },
+                { label: "Texture", val: analysis.feel.texture },
+              ].map(({ label, val }) => (
+                <div key={label} className="bg-surface-3 rounded-xl p-3 flex justify-between items-center">
+                  <p className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</p>
+                  <p className="text-sm font-semibold text-gray-200 capitalize">{val}</p>
+                </div>
+              ))}
+            </div>
 
-          {/* Chord Progression */}
+            {/* Brightness bar */}
+            <div className="mt-3">
+              <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                <span>Dark</span>
+                <span>Bright</span>
+              </div>
+              <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-brand-600 to-cyan-400 transition-all"
+                  style={{ width: `${analysis.feel.brightness_score * 100}%` }}
+                />
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* ── Center column: Chord Progression ── */}
+        <div className="space-y-4">
           <Card icon={Music} title="Chord Progression" iconBg="bg-brand-600">
             <div className="mb-3">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Order Played</p>
@@ -202,39 +232,9 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
               <p className="text-xs text-red-400 mt-2">{pianoError}</p>
             )}
           </Card>
-
-          {/* Sonic Feel */}
-          <Card icon={Sparkles} title="Sonic Feel" iconBg="bg-purple-600">
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { label: "Tone",    val: analysis.feel.tone },
-                { label: "Dynamic", val: analysis.feel.dynamic },
-                { label: "Texture", val: analysis.feel.texture },
-              ].map(({ label, val }) => (
-                <div key={label} className="bg-surface-3 rounded-xl p-3 text-center">
-                  <p className="text-[10px] text-gray-500 uppercase tracking-wider mb-1">{label}</p>
-                  <p className="text-sm font-semibold text-gray-200 capitalize">{val}</p>
-                </div>
-              ))}
-            </div>
-
-            {/* Brightness bar */}
-            <div className="mt-3">
-              <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                <span>Dark</span>
-                <span>Bright</span>
-              </div>
-              <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-brand-600 to-cyan-400 transition-all"
-                  style={{ width: `${analysis.feel.brightness_score * 100}%` }}
-                />
-              </div>
-            </div>
-          </Card>
         </div>
 
-        {/* ── Right column ── */}
+        {/* ── Right column: Stage / Working / Missing ── */}
         <div className="space-y-4">
 
           {/* Stage badge */}

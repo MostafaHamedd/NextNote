@@ -151,7 +151,7 @@ function schedulePianoNote(
 
 export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
   const [activeIdx, setActiveIdx] = useState(0);
-  const [selectedMode, setSelectedMode] = useState<"arpeggio" | "chord">("arpeggio");
+  const [selectedMode, setSelectedMode] = useState<"arpeggio" | "chord">("chord");
   const [isAuto, setIsAuto] = useState(false);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
@@ -211,7 +211,7 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
       stopPlayback();
       if (!notes.length) return;
       const [ctx, dest] = getDestination();
-      const stepSecs = 60 / tempo / 2;
+      const stepSecs = 60 / tempo / 12; // 3× faster than 16th-note steps
       const pattern = [...notes, ...[...notes].reverse().slice(1)];
       const startAt = ctx.currentTime + 0.05;
       const allSources: AudioScheduledSourceNode[] = [];
