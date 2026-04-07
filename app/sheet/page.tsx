@@ -2,43 +2,41 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Music, BookOpen, Upload } from "lucide-react";
+import { Music, BookOpen, Music2 } from "lucide-react";
 import clsx from "clsx";
 import { sheetStore } from "@/lib/sheetStore";
-import LearnSongTab    from "@/components/sheet/LearnSongTab";
-import SheetUploadTab  from "@/components/sheet/SheetUploadTab";
-import LoadingCard     from "@/components/ui/LoadingCard";
-import ErrorBanner     from "@/components/ui/ErrorBanner";
+import LearnSongTab   from "@/components/sheet/LearnSongTab";
+import MidiUploadTab  from "@/components/sheet/MidiUploadTab";
+import LoadingCard    from "@/components/ui/LoadingCard";
+import ErrorBanner    from "@/components/ui/ErrorBanner";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-type Tab = "learn" | "upload";
+type Tab = "learn" | "midi";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "learn",  label: "Learn Song",    icon: BookOpen },
-  { id: "upload", label: "Upload Sheet",  icon: Upload   },
+  { id: "learn", label: "Learn Song",   icon: BookOpen },
+  { id: "midi",  label: "Upload MIDI",  icon: Music2   },
 ];
 
 export default function SheetPage() {
   const router = useRouter();
-  const [tab, setTab]         = useState<Tab>("learn");
-  const [loading, setLoading] = useState(false);
+  const [tab, setTab]           = useState<Tab>("learn");
+  const [loading, setLoading]   = useState(false);
   const [progress, setProgress] = useState("");
-  const [error, setError]     = useState<string | null>(null);
-
-  // Pending upload file (set by SheetUploadTab, consumed when user clicks Parse)
-  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [error, setError]       = useState<string | null>(null);
+  const [pendingMidi, setPendingMidi] = useState<File | null>(null);
 
   const navigateToPlay = (data: object) => {
     sheetStore.set(data as any);
     router.push("/sheet/play");
   };
 
-  // ── Learn Song ───────────────────────────────────────────────────────────
+  // ── Learn Song ──────────────────────────────────────────────────────────────
   const handleLearnSong = async (title: string) => {
     setLoading(true);
     setError(null);
-    setProgress(`Asking GPT-4o to transcribe "${title}"…`);
+    setProgress(`Searching MIDI for "${title}"…`);
     try {
       const res = await fetch(`${API_URL}/learn-song`, {
         method: "POST",
@@ -60,22 +58,22 @@ export default function SheetPage() {
     }
   };
 
-  // ── Upload Sheet ─────────────────────────────────────────────────────────
-  const handleUploadAnalyze = async () => {
-    if (!pendingFile) return;
+  // ── Upload MIDI ─────────────────────────────────────────────────────────────
+  const handleMidiUpload = async () => {
+    if (!pendingMidi) return;
     setLoading(true);
     setError(null);
-    setProgress("Parsing with GPT-4o Vision… this may take 30–60s");
+    setProgress("Parsing MIDI file…");
     try {
       const form = new FormData();
-      form.append("file", pendingFile);
-      const res = await fetch(`${API_URL}/parse-sheet`, { method: "POST", body: form });
+      form.append("file", pendingMidi);
+      const res = await fetch(`${API_URL}/upload-midi`, { method: "POST", body: form });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `Server error: ${res.status}`);
       }
       const data = await res.json();
-      if (!data.notes?.length) throw new Error("No notes detected. Try a clearer image.");
+      if (!data.notes?.length) throw new Error("No notes found in this MIDI file.");
       navigateToPlay(data);
     } catch (e: any) {
       setError(e.message || "Something went wrong.");
@@ -84,8 +82,6 @@ export default function SheetPage() {
       setProgress("");
     }
   };
-
-  const isPDF = pendingFile?.name.toLowerCase().endsWith(".pdf");
 
   return (
     <div className="min-h-screen bg-surface relative overflow-hidden">
@@ -110,7 +106,7 @@ export default function SheetPage() {
           </div>
           <h1 className="text-3xl font-bold text-white mb-3">Learn Piano</h1>
           <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
-            Search a song by name or upload sheet music — watch the keys light up as it plays.
+            Search a song by name or upload your own MIDI file — watch the keys light up as it plays.
           </p>
         </div>
 
@@ -138,21 +134,21 @@ export default function SheetPage() {
           <LearnSongTab loading={loading} onLoad={handleLearnSong} />
         )}
 
-        {tab === "upload" && (
-          <SheetUploadTab onFileReady={f => { setPendingFile(f); setError(null); }} />
+        {tab === "midi" && (
+          <MidiUploadTab onFileReady={f => { setPendingMidi(f); setError(null); }} />
         )}
 
-        {/* Shared error */}
+        {/* Error */}
         {error && <ErrorBanner message={error} className="mt-4" />}
 
-        {/* Upload CTA */}
-        {tab === "upload" && pendingFile && !loading && (
+        {/* MIDI upload CTA */}
+        {tab === "midi" && pendingMidi && !loading && (
           <button
-            onClick={handleUploadAnalyze}
+            onClick={handleMidiUpload}
             className="mt-6 w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-semibold text-white bg-gradient-to-r from-brand-600 to-accent-purple hover:opacity-90 transition-all shadow-lg shadow-brand-900/30"
           >
-            <Music size={17} />
-            Parse &amp; Visualize
+            <Music2 size={17} />
+            Visualize MIDI
           </button>
         )}
 
@@ -162,18 +158,16 @@ export default function SheetPage() {
             message={progress}
             hint={
               tab === "learn"
-                ? "GPT-4o is transcribing the full piece — usually 10–20s."
-                : isPDF
-                ? "Each page is analysed separately and merged."
-                : "High-detail analysis enabled."
+                ? "Searching MIDI databases — usually under 10s."
+                : "Reading note timings, hand assignment, and sustain pedal…"
             }
           />
         )}
 
         <p className="text-center text-xs text-gray-600 mt-8 leading-relaxed">
           {tab === "learn"
-            ? "Best for classical pieces and well-known songs. GPT-4o may approximate lesser-known works."
-            : "Best results with printed/engraved scores. Handwritten scores may have errors."}
+            ? "Best for classical pieces and well-known songs."
+            : "Supports standard MIDI files. Both hands, tempo changes, and sustain are detected automatically."}
         </p>
       </div>
     </div>
