@@ -16,7 +16,7 @@ export default function ResultsPage() {
   useEffect(() => {
     const stored = resultStore.get();
     if (!stored) {
-      router.replace("/");
+      router.replace("/analyze");
       return;
     }
 
@@ -51,7 +51,7 @@ export default function ResultsPage() {
         {/* Back + file label row */}
         <div className="flex items-center justify-between mb-6">
           <Link
-            href="/"
+            href="/analyze"
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-300 transition-colors"
           >
             <ArrowLeft size={14} />

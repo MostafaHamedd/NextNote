@@ -2,15 +2,21 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PlusCircle, Music, Clock } from "lucide-react";
+import { Home, PlusCircle, Music, Clock } from "lucide-react";
 import clsx from "clsx";
 
 const LINKS = [
   {
     href: "/",
+    label: "Home",
+    icon: Home,
+    active: (p: string) => p === "/",
+  },
+  {
+    href: "/analyze",
     label: "Guitar→Piano",
     icon: PlusCircle,
-    active: (p: string) => p === "/" || p === "/results",
+    active: (p: string) => p === "/analyze" || p === "/results",
   },
   {
     href: "/visualizer",

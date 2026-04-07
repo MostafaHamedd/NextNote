@@ -37,22 +37,25 @@ export default function Sidebar() {
     <>
       <aside className="hidden md:flex fixed top-0 left-0 h-full w-44 bg-surface-1 border-r border-surface-border flex-col z-40">
 
-        {/* Logo */}
-        <div className="flex items-center gap-2.5 px-4 h-14 border-b border-surface-border shrink-0">
+        {/* Logo → home */}
+        <Link
+          href="/"
+          className="flex items-center gap-2.5 px-4 h-14 border-b border-surface-border shrink-0 hover:bg-surface-3/50 transition-colors"
+        >
           <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center shrink-0">
             <Zap size={13} className="text-white" />
           </div>
           <span className="font-bold text-white text-sm tracking-tight">NextNote</span>
-        </div>
+        </Link>
 
         {/* Nav items */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
 
           <Link
-            href="/"
+            href="/analyze"
             className={clsx(
               "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-              pathname === "/" || pathname === "/results"
+              pathname === "/analyze" || pathname === "/results"
                 ? "bg-brand-600 text-white"
                 : "text-gray-400 hover:text-white hover:bg-surface-3"
             )}

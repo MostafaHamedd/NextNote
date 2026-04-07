@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Music, Zap, Lightbulb, Star, ArrowRight,
   Sparkles, Tag, Piano, Loader2,
@@ -113,6 +113,21 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
   const [pianoLoading, setPianoLoading] = useState(false);
   const [pianoError, setPianoError] = useState<string | null>(null);
   const [showPiano, setShowPiano] = useState(false);
+  const pianoSectionRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showPiano || !pianoData) return;
+    if (typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 1023px)").matches) return;
+
+    const el = pianoSectionRef.current;
+    if (!el) return;
+
+    const id = window.setTimeout(() => {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 80);
+    return () => window.clearTimeout(id);
+  }, [showPiano, pianoData]);
 
   const fmt = (s: number) =>
     s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
@@ -158,11 +173,11 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         <StatCard label="Style"    value={styleMain}      sub={styleSub} />
       </div>
 
-      {/* ── Row 2: 3-column layout ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_2fr_1fr] gap-4 items-start">
+      {/* ── Row 2: Sonic | Chords | Stage on lg; on mobile piano sits right under Chords ── */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_2fr_1fr] lg:gap-4 lg:items-start">
 
         {/* ── Left column: Sonic Feel ── */}
-        <div className="space-y-4">
+        <div className="space-y-4 w-full lg:row-start-1 lg:col-start-1 lg:self-start">
           <Card icon={Sparkles} title="Sonic Feel" iconBg="bg-purple-600">
             <div className="grid grid-cols-1 gap-2">
               {[
@@ -194,7 +209,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         </div>
 
         {/* ── Center column: Chord Progression ── */}
-        <div className="space-y-4">
+        <div className="space-y-4 w-full min-w-0 lg:row-start-1 lg:col-start-2 lg:self-start">
           <Card icon={Music} title="Chord Progression" iconBg="bg-brand-600">
             <div className="mb-3">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Order Played</p>
@@ -242,8 +257,22 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           </Card>
         </div>
 
+        {/* ── Piano: directly under chord card in reading order; full-width row below on desktop ── */}
+        {showPiano && pianoData && (
+          <div
+            ref={pianoSectionRef}
+            className="w-full min-w-0 scroll-mt-4 lg:row-start-2 lg:col-span-3 lg:col-start-1"
+          >
+            <PianoView
+              chordData={pianoData}
+              bpm={analysis.bpm}
+              onClose={() => setShowPiano(false)}
+            />
+          </div>
+        )}
+
         {/* ── Right column: Stage / Working / Missing ── */}
-        <div className="space-y-4">
+        <div className="space-y-4 w-full lg:row-start-1 lg:col-start-3 lg:self-start">
 
           {/* Stage badge */}
           <div className="flex items-start gap-3 bg-surface-2 rounded-2xl p-5 border border-surface-border">
@@ -277,15 +306,6 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           </div>
         </div>
       </div>
-
-      {/* ── Piano View (full width, conditional) ── */}
-      {showPiano && pianoData && (
-        <PianoView
-          chordData={pianoData}
-          bpm={analysis.bpm}
-          onClose={() => setShowPiano(false)}
-        />
-      )}
 
       {/* ── Next Step hero (full width) ── */}
       <div className="gradient-border">
