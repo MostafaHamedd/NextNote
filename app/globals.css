@@ -111,3 +111,17 @@ body {
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.35), rgba(168, 85, 247, 0.35));
   transform: translateY(-2px);
 }
+
+/* Mobile safe-area support (iOS notch / home indicator) */
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+}
+
+/* Touch-friendly tap targets on mobile */
+@media (max-width: 767px) {
+  button, a {
+    min-height: 36px;
+  }
+}

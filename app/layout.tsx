@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
+import MobileNav from "@/components/MobileNav";
 
 export const metadata: Metadata = {
   title: "NextNote — Producer Brain for Guitarists",
-  description: "Record your guitar idea and get instant producer feedback powered by AI",
+  description: "Record your guitar idea for chord detection, tempo, and piano visualizer practice",
 };
 
 export default function RootLayout({
@@ -14,10 +15,16 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
+      <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+      </head>
       <body className="flex min-h-screen bg-surface overflow-x-hidden">
         <Sidebar />
-        {/* Main content — offset by the fixed 176px (w-44) sidebar */}
-        <div className="flex-1 ml-44 min-w-0 overflow-x-hidden">{children}</div>
+        {/* Main content: no left margin on mobile, sidebar offset on md+ */}
+        <div className="flex-1 md:ml-44 ml-0 min-w-0 overflow-x-hidden pb-16 md:pb-0">
+          {children}
+        </div>
+        <MobileNav />
       </body>
     </html>
   );

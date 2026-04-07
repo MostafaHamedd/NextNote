@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { PlusCircle, Music, Clock, Settings, Zap } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import clsx from "clsx";
 import HistorySidebar from "@/components/HistorySidebar";
 import { useSessionHistory, Session } from "@/hooks/useSessionHistory";
@@ -14,6 +14,13 @@ export default function Sidebar() {
   const router = useRouter();
   const [showHistory, setShowHistory] = useState(false);
   const { sessions, deleteSession, clearAll } = useSessionHistory();
+
+  // Allow MobileNav to open the history panel via a DOM event
+  useEffect(() => {
+    const handler = () => setShowHistory(true);
+    window.addEventListener("open-history", handler);
+    return () => window.removeEventListener("open-history", handler);
+  }, []);
 
   const handleRestore = (session: Session) => {
     resultStore.set({
@@ -28,7 +35,7 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed top-0 left-0 h-full w-44 bg-surface-1 border-r border-surface-border flex flex-col z-40">
+      <aside className="hidden md:flex fixed top-0 left-0 h-full w-44 bg-surface-1 border-r border-surface-border flex-col z-40">
 
         {/* Logo */}
         <div className="flex items-center gap-2.5 px-4 h-14 border-b border-surface-border shrink-0">
@@ -51,20 +58,20 @@ export default function Sidebar() {
             )}
           >
             <PlusCircle size={15} />
-            New Analysis
+            <span className="leading-tight text-left">Guitar → Piano</span>
           </Link>
 
           <Link
-            href="/sheet"
+            href="/visualizer"
             className={clsx(
               "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-              pathname === "/sheet" || pathname === "/sheet/play"
+              pathname === "/visualizer" || pathname === "/visualizer/play"
                 ? "bg-brand-600 text-white"
                 : "text-gray-400 hover:text-white hover:bg-surface-3"
             )}
           >
             <Music size={15} />
-            Sheet Music
+            Visualizer
           </Link>
 
           <button

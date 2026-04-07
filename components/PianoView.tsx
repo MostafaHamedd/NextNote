@@ -3,6 +3,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { ChevronLeft, ChevronRight, Square, RotateCcw, X } from "lucide-react";
 import clsx from "clsx";
+import {
+  pitchToMidi,
+  normalisePitch,
+  midiToSoundfontUrl,
+  playSample,
+} from "@/lib/pianoUtils";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -44,108 +50,14 @@ const BLACK_KEYS: { note: string; x: number }[] = [
 
 const PIANO_WIDTH = 600;
 
-// ─── Frequencies ─────────────────────────────────────────────────────────────
-
-const NOTE_FREQ: Record<string, number> = {
-  C3: 130.81, "C#3": 138.59, D3: 146.83, "D#3": 155.56, E3: 164.81,
-  F3: 174.61, "F#3": 185.00, G3: 196.00, "G#3": 207.65, A3: 220.00,
-  "A#3": 233.08, B3: 246.94,
-  C4: 261.63, "C#4": 277.18, D4: 293.66, "D#4": 311.13, E4: 329.63,
-  F4: 349.23, "F#4": 369.99, G4: 392.00, "G#4": 415.30, A4: 440.00,
-  "A#4": 466.16, B4: 493.88,
-  C5: 523.25,
-};
-
-// ─── Piano synthesis ──────────────────────────────────────────────────────────
-//
-// A concert grand is modelled with:
-//   • 6 sine-wave partials at harmonic multiples, each with an independent
-//     two-stage envelope (fast initial decay → long tail).  Lower partials
-//     sustain much longer than higher ones, matching real piano physics.
-//   • A brief bandpass-filtered noise burst for the hammer strike transient.
-//   • A DynamicsCompressorNode shared across all notes so chords don't clip.
-//
-// Returns the note's sustain duration (seconds) so callers know when it ends.
-
-const HARMONICS = [
-  { ratio: 1.0, gain: 1.00, decayFrac: 1.00 },
-  { ratio: 2.0, gain: 0.50, decayFrac: 0.70 },
-  { ratio: 3.0, gain: 0.25, decayFrac: 0.52 },
-  { ratio: 4.0, gain: 0.12, decayFrac: 0.40 },
-  { ratio: 5.0, gain: 0.07, decayFrac: 0.32 },
-  { ratio: 6.0, gain: 0.04, decayFrac: 0.25 },
-];
-
-function schedulePianoNote(
-  ctx: AudioContext,
-  dest: AudioNode,
-  freq: number,
-  startTime: number,
-  velocity = 0.65,
-  out: AudioScheduledSourceNode[],
-): number {
-  // Lower notes sustain longer — mirrors real string physics
-  const duration = Math.max(1.5, 2.8 - freq / 500);
-
-  // Per-note master gain (velocity)
-  const master = ctx.createGain();
-  master.gain.setValueAtTime(velocity * 0.38, startTime);
-  master.connect(dest);
-
-  // Harmonic partials
-  HARMONICS.forEach(({ ratio, gain, decayFrac }) => {
-    const decay = duration * decayFrac;
-    const osc = ctx.createOscillator();
-    const g = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.setValueAtTime(freq * ratio, startTime);
-
-    // Two-stage piano envelope:
-    //   0 → peak in 3 ms (hammer strike)
-    //   peak → 55 % in 60 ms (fast initial decay, the "thump")
-    //   55 % → near-zero over full decay (the piano's long ring-out)
-    g.gain.setValueAtTime(0, startTime);
-    g.gain.linearRampToValueAtTime(gain, startTime + 0.003);
-    g.gain.exponentialRampToValueAtTime(gain * 0.55, startTime + 0.06);
-    g.gain.exponentialRampToValueAtTime(0.0001, startTime + decay);
-
-    osc.connect(g);
-    g.connect(master);
-    osc.start(startTime);
-    osc.stop(startTime + decay + 0.05);
-    out.push(osc);
-  });
-
-  // Hammer-strike noise: brief burst of bandpass-filtered white noise
-  const noiseDur = 0.03;
-  const noiseLen = Math.ceil(ctx.sampleRate * noiseDur);
-  const noiseBuf = ctx.createBuffer(1, noiseLen, ctx.sampleRate);
-  const d = noiseBuf.getChannelData(0);
-  for (let i = 0; i < noiseLen; i++) d[i] = Math.random() * 2 - 1;
-
-  const noise = ctx.createBufferSource();
-  noise.buffer = noiseBuf;
-
-  const noiseFilter = ctx.createBiquadFilter();
-  noiseFilter.type = "bandpass";
-  noiseFilter.frequency.setValueAtTime(
-    Math.min(freq * 3, ctx.sampleRate * 0.4),
-    startTime,
-  );
-  noiseFilter.Q.setValueAtTime(1.2, startTime);
-
-  const noiseGain = ctx.createGain();
-  noiseGain.gain.setValueAtTime(velocity * 0.10, startTime);
-  noiseGain.gain.exponentialRampToValueAtTime(0.0001, startTime + noiseDur);
-
-  noise.connect(noiseFilter);
-  noiseFilter.connect(noiseGain);
-  noiseGain.connect(master);
-  noise.start(startTime);
-  out.push(noise);
-
-  return duration;
-}
+/** MIDI numbers for every key on this keyboard (same FluidR3 samples as the visualizer). */
+const PIANO_KEY_MIDIS = Array.from(
+  new Set(
+    [...WHITE_KEYS, ...BLACK_KEYS]
+      .map(({ note }) => pitchToMidi(normalisePitch(note)))
+      .filter((m) => m >= 0),
+  ),
+).sort((a, b) => a - b);
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
@@ -153,11 +65,28 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
   const [activeIdx, setActiveIdx] = useState(0);
   const [selectedMode, setSelectedMode] = useState<"arpeggio" | "chord">("chord");
   const [isAuto, setIsAuto] = useState(false);
+  const [pianoViewW, setPianoViewW] = useState(0);
+  const pianoContainerRef = useRef<HTMLDivElement>(null);
+
+  // Fit keyboard to container width — no horizontal scroll.
+  useEffect(() => {
+    const el = pianoContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => setPianoViewW(el.clientWidth));
+    ro.observe(el);
+    setPianoViewW(el.clientWidth);
+    return () => ro.disconnect();
+  }, []);
+
+  const pianoScale =
+    pianoViewW > 0 ? pianoViewW / PIANO_WIDTH : 1;
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const compressorRef = useRef<DynamicsCompressorNode | null>(null);
+  const buffersRef = useRef<Map<number, AudioBuffer>>(new Map());
   const playingSourcesRef = useRef<AudioScheduledSourceNode[]>([]);
   const autoTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [samplerReady, setSamplerReady] = useState(false);
 
   const activeIdxRef = useRef(activeIdx);
   activeIdxRef.current = activeIdx;
@@ -167,85 +96,139 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
   const activeChord = chordData[activeIdx] ?? chordData[0];
   const activeNotes = new Set(activeChord?.notes ?? []);
 
-  // ── Shared AudioContext + Compressor ────────────────────────────────────────
+  // Same MusyngKite grand-piano chain as usePianoSampler (visualizer).
+  useEffect(() => {
+    let cancelled = false;
+    setSamplerReady(false);
+    buffersRef.current = new Map();
 
-  const getDestination = useCallback((): [AudioContext, AudioNode] => {
-    if (!audioCtxRef.current || audioCtxRef.current.state === "closed") {
-      const ctx = new AudioContext();
-      audioCtxRef.current = ctx;
+    const ctx = new AudioContext();
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.setValueAtTime(-22, ctx.currentTime);
+    comp.ratio.setValueAtTime(6, ctx.currentTime);
+    const master = ctx.createGain();
+    master.gain.value = 4.48;
+    comp.connect(master);
+    master.connect(ctx.destination);
+    audioCtxRef.current = ctx;
+    compressorRef.current = comp;
 
-      // Compressor prevents chords from clipping
-      const comp = ctx.createDynamicsCompressor();
-      comp.threshold.setValueAtTime(-18, ctx.currentTime);
-      comp.knee.setValueAtTime(6, ctx.currentTime);
-      comp.ratio.setValueAtTime(4, ctx.currentTime);
-      comp.attack.setValueAtTime(0.003, ctx.currentTime);
-      comp.release.setValueAtTime(0.25, ctx.currentTime);
-      comp.connect(ctx.destination);
-      compressorRef.current = comp;
-    }
-    if (audioCtxRef.current.state === "suspended") {
-      audioCtxRef.current.resume();
-    }
-    return [audioCtxRef.current, compressorRef.current!];
+    Promise.all(
+      PIANO_KEY_MIDIS.map(async (midi) => {
+        try {
+          const res = await fetch(midiToSoundfontUrl(midi));
+          if (!res.ok) return;
+          const ab = await res.arrayBuffer();
+          const buf = await ctx.decodeAudioData(ab);
+          if (!cancelled) buffersRef.current.set(midi, buf);
+        } catch {
+          /* skip */
+        }
+      }),
+    ).then(() => {
+      if (!cancelled) setSamplerReady(true);
+    });
+
+    return () => {
+      cancelled = true;
+      ctx.close();
+    };
   }, []);
 
-  // ── Playback helpers ────────────────────────────────────────────────────────
+  const ensureAudio = useCallback((): [AudioContext, AudioNode] | null => {
+    const ctx = audioCtxRef.current;
+    const comp = compressorRef.current;
+    if (!ctx || !comp || ctx.state === "closed") return null;
+    if (ctx.state === "suspended") void ctx.resume();
+    return [ctx, comp];
+  }, []);
+
+  const playSampleNote = useCallback(
+    (
+      note: string,
+      ctx: AudioContext,
+      dest: AudioNode,
+      startTime: number,
+      durSec: number,
+      velocity: number,
+      out: AudioScheduledSourceNode[],
+    ) => {
+      const midi = pitchToMidi(normalisePitch(note));
+      if (midi < 0) return;
+      const buffer = buffersRef.current.get(midi);
+      if (!buffer) return;
+      playSample(ctx, dest, buffer, startTime, durSec, velocity, out);
+    },
+    [],
+  );
 
   const stopPlayback = useCallback(() => {
-    playingSourcesRef.current.forEach((n) => { try { n.stop(); } catch {} });
+    playingSourcesRef.current.forEach((n) => {
+      try {
+        n.stop();
+      } catch {
+        /* already stopped */
+      }
+    });
     playingSourcesRef.current = [];
   }, []);
 
-  /** Click a key → instant single-note preview (does not interrupt playback). */
-  const previewNote = useCallback((note: string) => {
-    const freq = NOTE_FREQ[note];
-    if (!freq) return;
-    const [ctx, dest] = getDestination();
-    schedulePianoNote(ctx, dest, freq, ctx.currentTime, 0.6, []);
-  }, [getDestination]);
+  /** Click a key → single-note preview (does not stop chord / arpeggio bus). */
+  const previewNote = useCallback(
+    (note: string) => {
+      if (!samplerReady) return;
+      const pair = ensureAudio();
+      if (!pair) return;
+      const [ctx, dest] = pair;
+      playSampleNote(note, ctx, dest, ctx.currentTime, 1.15, 0.62, []);
+    },
+    [samplerReady, ensureAudio, playSampleNote],
+  );
 
-  /** Ascending → descending arpeggio at 8th-note steps. */
+  /** Ascending → descending arpeggio; one note per eighth at `tempo` BPM. */
   const playArpeggio = useCallback(
     (notes: string[], tempo: number) => {
       stopPlayback();
-      if (!notes.length) return;
-      const [ctx, dest] = getDestination();
-      const stepSecs = 60 / tempo / 12; // 3× faster than 16th-note steps
+      if (!samplerReady || !notes.length) return;
+      const pair = ensureAudio();
+      if (!pair) return;
+      const [ctx, dest] = pair;
+      const quarterSec = 60 / tempo;
+      const stepSecs = quarterSec / 2;
       const pattern = [...notes, ...[...notes].reverse().slice(1)];
       const startAt = ctx.currentTime + 0.05;
       const allSources: AudioScheduledSourceNode[] = [];
+      const noteDur = Math.max(0.55, stepSecs * 0.92);
 
-      pattern.forEach((note, i) => {
-        const freq = NOTE_FREQ[note];
-        if (!freq) return;
+      pattern.forEach((raw, i) => {
         const t = startAt + i * stepSecs;
-        schedulePianoNote(ctx, dest, freq, t, 0.65, allSources);
+        playSampleNote(raw, ctx, dest, t, noteDur, 0.66, allSources);
       });
 
       playingSourcesRef.current = allSources;
     },
-    [stopPlayback, getDestination],
+    [stopPlayback, samplerReady, ensureAudio, playSampleNote],
   );
 
-  /** All notes struck simultaneously (tiny strum stagger for naturalness). */
+  /** All notes struck together (slight strum stagger). */
   const playChord = useCallback(
     (notes: string[]) => {
       stopPlayback();
-      if (!notes.length) return;
-      const [ctx, dest] = getDestination();
+      if (!samplerReady || !notes.length) return;
+      const pair = ensureAudio();
+      if (!pair) return;
+      const [ctx, dest] = pair;
       const allSources: AudioScheduledSourceNode[] = [];
+      const chordDur = 1.85;
 
-      notes.forEach((note, i) => {
-        const freq = NOTE_FREQ[note];
-        if (!freq) return;
+      notes.forEach((raw, i) => {
         const t = ctx.currentTime + 0.02 + i * 0.012;
-        schedulePianoNote(ctx, dest, freq, t, 0.60, allSources);
+        playSampleNote(raw, ctx, dest, t, chordDur, 0.6, allSources);
       });
 
       playingSourcesRef.current = allSources;
     },
-    [stopPlayback, getDestination],
+    [stopPlayback, samplerReady, ensureAudio, playSampleNote],
   );
 
   // ── Navigation ──────────────────────────────────────────────────────────────
@@ -292,10 +275,10 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
-    <div className="bg-surface-1 rounded-2xl border border-surface-border p-5">
+    <div className="bg-surface-1 rounded-2xl border border-surface-border p-3 sm:p-5">
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
 
         {/* Chord navigator */}
         <div className="flex items-center gap-2">
@@ -348,8 +331,10 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
 
           <button
             onClick={toggleAuto}
+            disabled={!samplerReady}
             className={clsx(
               "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-medium border transition-all",
+              !samplerReady && "opacity-40 cursor-wait",
               isAuto
                 ? "bg-red-500/20 text-red-400 border-red-500/30 hover:bg-red-500/30"
                 : "bg-brand-500/20 text-brand-300 border-brand-500/30 hover:bg-brand-500/30",
@@ -362,11 +347,26 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
             <X size={16} />
           </button>
         </div>
+        {!samplerReady && (
+          <p className="w-full text-center text-[11px] text-gray-500 sm:text-left sm:w-auto">Loading piano sound…</p>
+        )}
       </div>
 
       {/* Piano keyboard */}
-      <div className="overflow-x-auto pb-1">
-        <div className="relative select-none mx-auto" style={{ width: PIANO_WIDTH, height: WH }}>
+      <div
+        ref={pianoContainerRef}
+        className="w-full overflow-hidden pb-1"
+        style={{ height: WH * pianoScale }}
+      >
+        <div
+          className="relative select-none"
+          style={{
+            width: PIANO_WIDTH,
+            height: WH,
+            transform: `scale(${pianoScale})`,
+            transformOrigin: "top left",
+          }}
+        >
 
           {WHITE_KEYS.map(({ note, x }) => {
             const active = activeNotes.has(note);
@@ -384,11 +384,17 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
                 style={{ left: x, top: 0, width: WK - 1, height: WH }}
               >
                 {active && (
-                  <span className="absolute bottom-3 left-0 right-0 text-center text-[10px] font-bold font-mono text-white/90 pointer-events-none">
+                  <span
+                    className="absolute left-0 right-0 text-center font-bold font-mono text-white pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.85)] leading-none"
+                    style={{
+                      bottom: pianoScale < 0.5 ? 4 : 10,
+                      fontSize: pianoScale < 0.42 ? 9 : 11,
+                    }}
+                  >
                     {note}
                   </span>
                 )}
-                {!active && note.startsWith("C") && (
+                {!active && note.startsWith("C") && pianoScale > 0.32 && (
                   <span className="absolute bottom-2 left-0 right-0 text-center text-[9px] text-gray-400 pointer-events-none">
                     {note}
                   </span>
@@ -413,7 +419,13 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
                 style={{ left: x, top: 0, width: BKW, height: BKH }}
               >
                 {active && (
-                  <span className="absolute bottom-2 left-0 right-0 text-center text-[8px] font-bold font-mono text-white/90 pointer-events-none">
+                  <span
+                    className="absolute left-0 right-0 text-center font-bold font-mono text-white pointer-events-none drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] leading-none"
+                    style={{
+                      bottom: pianoScale < 0.5 ? 3 : 8,
+                      fontSize: pianoScale < 0.42 ? 7 : 9,
+                    }}
+                  >
                     {note.replace("#", "♯")}
                   </span>
                 )}

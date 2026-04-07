@@ -186,7 +186,7 @@ export default function AudioRecorder({ onAudioReady, isAnalyzing }: AudioRecord
               className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-brand-600 to-accent-purple rounded-full font-semibold text-white hover:opacity-90 transition-all hover:scale-105 disabled:opacity-50 disabled:scale-100 shadow-lg shadow-brand-900/40"
             >
               <Send size={16} />
-              {isAnalyzing ? "Analyzing..." : "Analyze"}
+              {isAnalyzing ? "Working…" : "Get chords"}
             </button>
           </>
         )}

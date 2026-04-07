@@ -41,46 +41,46 @@ export default function SynthesiaView({ data }: { data: SheetData }) {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-2 min-w-0">
         <div className="min-w-0">
-          <p className="font-bold text-white text-base truncate">{data.title || "Sheet Music"}</p>
+          <p className="font-bold text-white text-base truncate">{data.title || "Piece"}</p>
           <p className="text-xs text-gray-500">
             {data.timeSignature} · {data.tempo} BPM · {Math.round(totalSec)}s
           </p>
         </div>
         <div className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-brand-500 inline-block" />
-            Right hand
-          </span>
-          <span className="flex items-center gap-1.5">
             <span className="w-3 h-3 rounded-sm bg-cyan-500 inline-block" />
             Left hand
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-3 h-3 rounded-sm bg-brand-500 inline-block" />
+            Right hand
           </span>
         </div>
       </div>
 
-      {/* Keyboard */}
-      <PianoKeyboard
-        whiteKeys={whiteKeys}
-        blackKeys={blackKeys}
-        pianoW={pianoW}
-        activeNotes={playback.activeNotes}
-      />
-
-      {/* Controls */}
-      <PlayerControls
-        playing={playback.playing}
-        samplerReady={sampler.samplerReady}
-        progress={playback.progress}
-        totalSec={totalSec}
-        speed={playback.speed}
-        sustainOn={playback.sustainOn}
-        hasSustain={data.hasSustainEvents ?? false}
-        onPlay={playback.handlePlay}
-        onReset={playback.handleReset}
-        onSeek={playback.handleSeek}
-        onSpeedChange={playback.setSpeed}
-        onSustainToggle={() => playback.setSustainOn(v => !v)}
-      />
+      {/* Mobile: controls above piano; md+: piano then controls */}
+      <div className="flex flex-col-reverse gap-4 md:flex-col">
+        <PianoKeyboard
+          whiteKeys={whiteKeys}
+          blackKeys={blackKeys}
+          pianoW={pianoW}
+          activeNotes={playback.activeNotes}
+        />
+        <PlayerControls
+          playing={playback.playing}
+          samplerReady={sampler.samplerReady}
+          progress={playback.progress}
+          totalSec={totalSec}
+          speed={playback.speed}
+          sustainOn={playback.sustainOn}
+          hasSustain={data.hasSustainEvents ?? false}
+          onPlay={playback.handlePlay}
+          onReset={playback.handleReset}
+          onSeek={playback.handleSeek}
+          onSpeedChange={playback.setSpeed}
+          onSustainToggle={() => playback.setSustainOn(v => !v)}
+        />
+      </div>
     </div>
   );
 }

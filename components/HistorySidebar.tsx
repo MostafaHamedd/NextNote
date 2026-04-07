@@ -92,7 +92,7 @@ export default function HistorySidebar({
               <div>
                 <p className="text-gray-400 font-medium">No sessions yet</p>
                 <p className="text-gray-600 text-sm mt-1">
-                  Analyze a recording to start building your history
+                  Record guitar — we’ll detect chords and key for piano view.
                 </p>
               </div>
             </div>
@@ -170,7 +170,7 @@ function SessionCard({
           e.stopPropagation();
           onDelete(session.id);
         }}
-        className="absolute top-3 right-3 p-1.5 rounded-lg bg-surface-3 text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+        className="absolute top-3 right-3 p-1.5 rounded-lg bg-surface-3 text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-100 md:opacity-0 md:group-hover:opacity-100"
         title="Delete session"
       >
         <Trash2 size={13} />

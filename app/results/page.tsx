@@ -55,7 +55,7 @@ export default function ResultsPage() {
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-300 transition-colors"
           >
             <ArrowLeft size={14} />
-            New Analysis
+            Guitar → Piano
           </Link>
           {label && (
             <div className="flex items-center gap-1.5 text-sm text-gray-500">

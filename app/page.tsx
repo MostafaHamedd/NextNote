@@ -94,13 +94,13 @@ export default function Home() {
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-brand-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute top-24 right-1/4 w-64 h-64 bg-accent-purple/8 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 max-w-5xl mx-auto px-4 py-16">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 py-8 sm:py-16">
 
         {/* Header */}
         <div className="max-w-2xl mx-auto text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-4 py-1.5 mb-6">
             <Zap size={14} className="text-brand-400" />
-            <span className="text-sm font-medium text-brand-300">Powered by GPT-4o</span>
+            <span className="text-sm font-medium text-brand-300">Chord &amp; tempo analysis</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
@@ -110,7 +110,7 @@ export default function Home() {
             Producer Brain<br />for Guitarists
           </p>
           <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
-            Record or upload your guitar idea. Get instant analysis, chord detection, and actionable producer feedback.
+            Record or upload your guitar idea. Get chord detection, key, tempo, and sonic stats — producer insights coming soon.
           </p>
         </div>
 

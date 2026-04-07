@@ -15,11 +15,11 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 type Tab = "learn" | "midi";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "learn", label: "Learn Song",   icon: BookOpen },
-  { id: "midi",  label: "Upload MIDI",  icon: Music2   },
+  { id: "learn", label: "Piano Visualizer", icon: BookOpen },
+  { id: "midi",  label: "Upload MIDI",      icon: Music2   },
 ];
 
-export default function SheetPage() {
+export default function VisualizerPage() {
   const router = useRouter();
   const [tab, setTab]           = useState<Tab>("learn");
   const [loading, setLoading]   = useState(false);
@@ -29,10 +29,9 @@ export default function SheetPage() {
 
   const navigateToPlay = (data: object) => {
     sheetStore.set(data as any);
-    router.push("/sheet/play");
+    router.push("/visualizer/play");
   };
 
-  // ── Learn Song ──────────────────────────────────────────────────────────────
   const handleLearnSong = async (title: string) => {
     setLoading(true);
     setError(null);
@@ -58,7 +57,6 @@ export default function SheetPage() {
     }
   };
 
-  // ── Upload MIDI ─────────────────────────────────────────────────────────────
   const handleMidiUpload = async () => {
     if (!pendingMidi) return;
     setLoading(true);
@@ -85,7 +83,6 @@ export default function SheetPage() {
 
   return (
     <div className="min-h-screen bg-surface relative overflow-hidden">
-      {/* Background grid */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -96,21 +93,19 @@ export default function SheetPage() {
       />
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-brand-600/10 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 max-w-2xl mx-auto px-4 py-16">
+      <div className="relative z-10 max-w-2xl mx-auto px-4 py-8 sm:py-16">
 
-        {/* Header */}
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-4 py-1.5 mb-5">
             <Music size={14} className="text-brand-400" />
             <span className="text-sm font-medium text-brand-300">Piano Visualizer</span>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-3">Learn Piano</h1>
+          <h1 className="text-3xl font-bold text-white mb-3">Visualizer</h1>
           <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
-            Search a song by name or upload your own MIDI file — watch the keys light up as it plays.
+            Search a song by name or upload a MIDI file — follow along on the piano keyboard.
           </p>
         </div>
 
-        {/* Tab switcher */}
         <div className="flex bg-surface-3 rounded-2xl p-1 mb-6 border border-surface-border">
           {TABS.map(({ id, label, icon: Icon }) => (
             <button
@@ -129,7 +124,6 @@ export default function SheetPage() {
           ))}
         </div>
 
-        {/* Tab content */}
         {tab === "learn" && (
           <LearnSongTab loading={loading} onLoad={handleLearnSong} />
         )}
@@ -138,10 +132,8 @@ export default function SheetPage() {
           <MidiUploadTab onFileReady={f => { setPendingMidi(f); setError(null); }} />
         )}
 
-        {/* Error */}
         {error && <ErrorBanner message={error} className="mt-4" />}
 
-        {/* MIDI upload CTA */}
         {tab === "midi" && pendingMidi && !loading && (
           <button
             onClick={handleMidiUpload}
@@ -152,7 +144,6 @@ export default function SheetPage() {
           </button>
         )}
 
-        {/* Loading state */}
         {loading && (
           <LoadingCard
             message={progress}

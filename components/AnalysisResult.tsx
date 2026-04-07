@@ -42,6 +42,14 @@ interface Props {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+const FEEDBACK_PENDING = "In progress";
+
+function feedbackBodyClass(text: string) {
+  return text === FEEDBACK_PENDING
+    ? "text-sm text-gray-500 italic"
+    : "text-gray-300 text-sm leading-relaxed";
+}
+
 // ─── Mood colour helper ───────────────────────────────────────────────────────
 
 const MOOD_COLORS: Record<string, string> = {
@@ -244,7 +252,9 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
             </div>
             <div>
               <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Current Stage</p>
-              <p className="text-sm font-semibold text-gray-200">{feedback.current_stage}</p>
+              <p className={clsx("text-sm font-semibold", feedback.current_stage === FEEDBACK_PENDING ? "text-gray-500 italic" : "text-gray-200")}>
+                {feedback.current_stage}
+              </p>
             </div>
           </div>
 
@@ -254,7 +264,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
               <Star size={14} className="text-green-400 shrink-0" />
               <p className="text-[10px] font-semibold text-green-400 uppercase tracking-widest">What's Working</p>
             </div>
-            <p className="text-gray-300 text-sm leading-relaxed">{feedback.what_is_working}</p>
+            <p className={feedbackBodyClass(feedback.what_is_working)}>{feedback.what_is_working}</p>
           </div>
 
           {/* What's missing */}
@@ -263,7 +273,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
               <ArrowRight size={14} className="text-amber-400 shrink-0" />
               <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest">What's Missing</p>
             </div>
-            <p className="text-gray-300 text-sm leading-relaxed">{feedback.what_is_missing}</p>
+            <p className={feedbackBodyClass(feedback.what_is_missing)}>{feedback.what_is_missing}</p>
           </div>
         </div>
       </div>
@@ -289,13 +299,15 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <p className="text-xl font-bold text-white mb-3">{feedback.next_step}</p>
-              <p className="text-gray-400 text-sm leading-relaxed">{feedback.next_step_detail}</p>
+              <p className={clsx("mb-3", feedback.next_step === FEEDBACK_PENDING ? "text-xl font-semibold text-gray-500 italic" : "text-xl font-bold text-white")}>
+                {feedback.next_step}
+              </p>
+              <p className={feedbackBodyClass(feedback.next_step_detail)}>{feedback.next_step_detail}</p>
             </div>
             {feedback.optional_step && (
               <div className="border-t md:border-t-0 md:border-l border-surface-border pt-4 md:pt-0 md:pl-6">
                 <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-2">Also Consider</p>
-                <p className="text-gray-300 text-sm leading-relaxed">{feedback.optional_step}</p>
+                <p className={feedbackBodyClass(feedback.optional_step)}>{feedback.optional_step}</p>
               </div>
             )}
           </div>
@@ -308,13 +320,17 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         {/* Genre */}
         <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Genre Directions</p>
-          <div className="flex flex-wrap gap-1.5">
-            {feedback.genre_suggestions?.map((g) => (
-              <span key={g} className="text-xs bg-surface-3 border border-surface-border text-gray-300 rounded-lg px-2.5 py-1">
-                {g}
-              </span>
-            ))}
-          </div>
+          {feedback.genre_suggestions?.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {feedback.genre_suggestions.map((g) => (
+                <span key={g} className="text-xs bg-surface-3 border border-surface-border text-gray-300 rounded-lg px-2.5 py-1">
+                  {g}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 italic">In progress</p>
+          )}
         </div>
 
         {/* Mood */}
@@ -322,18 +338,24 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
             <Tag size={10} /> Mood Tags
           </p>
-          <div className="flex flex-wrap gap-1.5">
-            {feedback.mood_tags?.map((m) => (
-              <span key={m} className={clsx("text-xs border rounded-lg px-2.5 py-1", moodColor(m))}>
-                {m}
-              </span>
-            ))}
-          </div>
+          {feedback.mood_tags?.length ? (
+            <div className="flex flex-wrap gap-1.5">
+              {feedback.mood_tags.map((m) => (
+                <span key={m} className={clsx("text-xs border rounded-lg px-2.5 py-1", moodColor(m))}>
+                  {m}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-gray-500 italic">In progress</p>
+          )}
         </div>
 
         {/* Why it works */}
         <Card icon={Lightbulb} title="Why It Works" iconBg="bg-cyan-600">
-          <p className="text-gray-400 text-xs leading-relaxed">{feedback.why_it_works}</p>
+          <p className={clsx("text-xs leading-relaxed", feedback.why_it_works === FEEDBACK_PENDING ? "text-gray-500 italic" : "text-gray-400")}>
+            {feedback.why_it_works}
+          </p>
         </Card>
       </div>
 
@@ -341,7 +363,9 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
       <div className="bg-gradient-to-r from-brand-900/30 to-accent-purple/10 rounded-2xl p-5 border border-brand-800/30">
         <div className="flex gap-3">
           <span className="text-2xl shrink-0">🎸</span>
-          <p className="text-gray-300 text-sm leading-relaxed italic">{feedback.producer_note}</p>
+          <p className={clsx("text-sm leading-relaxed", feedback.producer_note === FEEDBACK_PENDING ? "text-gray-500 italic" : "text-gray-300 italic")}>
+            {feedback.producer_note}
+          </p>
         </div>
       </div>
 

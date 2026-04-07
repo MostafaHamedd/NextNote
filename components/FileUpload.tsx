@@ -131,7 +131,7 @@ export default function FileUpload({ onFileSelected, isAnalyzing }: FileUploadPr
         />
       )}
 
-      {/* Analyze button — only shown when a file is ready */}
+      {/* Run detection — only shown when a file is ready */}
       {selectedFile && (
         <button
           onClick={submit}
@@ -139,7 +139,7 @@ export default function FileUpload({ onFileSelected, isAnalyzing }: FileUploadPr
           className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-brand-600 to-accent-purple rounded-full font-semibold text-white hover:opacity-90 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 shadow-lg shadow-brand-900/40"
         >
           <Send size={16} />
-          {isAnalyzing ? "Analyzing..." : "Analyze"}
+          {isAnalyzing ? "Working…" : "Get chords"}
         </button>
       )}
     </div>

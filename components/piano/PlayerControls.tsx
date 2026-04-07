@@ -20,97 +20,190 @@ interface Props {
   onSustainToggle: () => void;
 }
 
+const selectClass = clsx(
+  "rounded-xl border border-surface-border bg-surface-3",
+  "text-xs font-semibold text-gray-200 py-2 pl-2.5 pr-7",
+  "appearance-none bg-[length:1rem] bg-[right_0.4rem_center] bg-no-repeat",
+  "focus:outline-none focus:ring-2 focus:ring-brand-500/40 focus:border-brand-500/50",
+);
+
+const chevronBg =
+  "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E\")";
+
 export default function PlayerControls({
   playing, samplerReady, progress, totalSec,
   speed, sustainOn, hasSustain,
   onPlay, onReset, onSeek, onSpeedChange, onSustainToggle,
 }: Props) {
-  return (
-    <div className="pt-1 border-t border-surface-border space-y-2">
+  const playBtn = (
+    <button
+      type="button"
+      onClick={onPlay}
+      disabled={!samplerReady}
+      className={clsx(
+        "flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all shrink-0 min-h-[2.5rem] min-w-[2.5rem] md:min-w-0",
+        !samplerReady
+          ? "bg-surface-3 text-gray-500 cursor-wait"
+          : playing
+          ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
+          : "bg-brand-600 text-white hover:bg-brand-500 shadow-lg shadow-brand-900/30",
+      )}
+    >
+      {!samplerReady ? (
+        <Loader2 size={16} className="animate-spin" />
+      ) : playing ? (
+        <>
+          <Pause size={16} />
+          <span className="hidden sm:inline">Pause</span>
+        </>
+      ) : (
+        <>
+          <Play size={16} className="ml-0.5" />
+          <span className="hidden sm:inline">Play</span>
+        </>
+      )}
+    </button>
+  );
 
-      {/* Row 1 — Play / Reset / Progress */}
-      <div className="flex items-center gap-2">
-        <button
-          onClick={onPlay}
-          disabled={!samplerReady}
-          className={clsx(
-            "flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold transition-all shrink-0",
-            !samplerReady
-              ? "bg-surface-3 text-gray-500 cursor-wait"
-              : playing
-              ? "bg-red-500/20 text-red-400 border border-red-500/30 hover:bg-red-500/30"
-              : "bg-brand-600 text-white hover:bg-brand-500 shadow-lg shadow-brand-900/30",
-          )}
-        >
-          {!samplerReady
-            ? <><Loader2 size={13} className="animate-spin" /><span className="hidden sm:inline ml-1">Loading…</span></>
-            : playing
-            ? <><Pause size={13} /><span className="ml-1">Pause</span></>
-            : <><Play  size={13} /><span className="ml-1">Play</span></>}
-        </button>
+  const resetBtn = (
+    <button
+      type="button"
+      onClick={onReset}
+      className="p-2 rounded-xl text-gray-500 hover:text-gray-300 hover:bg-surface-3 transition-colors shrink-0 min-h-[2.5rem] min-w-[2.5rem] flex items-center justify-center"
+      aria-label="Reset playback"
+    >
+      <RotateCcw size={16} />
+    </button>
+  );
 
-        <button
-          onClick={onReset}
-          className="p-1.5 rounded-xl text-gray-500 hover:text-gray-300 hover:bg-surface-3 transition-colors shrink-0"
-        >
-          <RotateCcw size={13} />
-        </button>
+  const speedSelect = (
+    <label className="flex items-center gap-1.5 min-w-0 shrink">
+      <span className="sr-only">Playback speed</span>
+      <select
+        value={String(speed)}
+        onChange={e => {
+          const v = parseFloat(e.target.value);
+          if (SPEEDS.includes(v as Speed)) onSpeedChange(v as Speed);
+        }}
+        className={clsx(selectClass, "min-w-[4.5rem] max-w-[6.5rem] sm:min-w-[5.25rem] sm:max-w-none")}
+        style={{ backgroundImage: chevronBg }}
+      >
+        {SPEEDS.map(s => (
+          <option key={s} value={String(s)}>
+            {s === 1 ? "1× (normal)" : `${s}×`}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
-        <span className="text-xs font-mono text-gray-600 shrink-0 w-9 text-right">
-          {fmt(progress * totalSec)}
-        </span>
+  const pedalBtn = hasSustain ? (
+    <button
+      type="button"
+      onClick={onSustainToggle}
+      title={sustainOn ? "Sustain pedal ON — tap to disable" : "Sustain pedal OFF — tap to enable"}
+      className={clsx(
+        "shrink-0 rounded-lg border px-2 py-1.5 text-[10px] font-medium transition-colors min-h-[2.5rem] flex items-center",
+        sustainOn
+          ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
+          : "bg-surface-3 border-surface-border text-gray-500 hover:text-gray-300",
+      )}
+    >
+      🎹 {sustainOn ? "On" : "Off"}
+    </button>
+  ) : null;
 
+  const progressRow = (
+    <div className="flex items-center gap-2 w-full min-w-0">
+      <span className="text-xs font-mono text-gray-600 shrink-0 w-9 text-right tabular-nums">
+        {fmt(progress * totalSec)}
+      </span>
+      <div
+        className="flex-1 h-2 md:h-1.5 bg-surface-3 rounded-full cursor-pointer relative overflow-hidden min-w-0 touch-manipulation"
+        onClick={onSeek}
+        role="slider"
+        aria-label="Playback position"
+        aria-valuenow={Math.round(progress * 100)}
+        aria-valuemin={0}
+        aria-valuemax={100}
+      >
         <div
-          className="flex-1 h-1.5 bg-surface-3 rounded-full cursor-pointer relative overflow-hidden"
-          onClick={onSeek}
-        >
-          <div
-            className="absolute left-0 top-0 h-full bg-brand-500 rounded-full"
-            style={{ width: `${progress * 100}%` }}
-          />
-        </div>
-
-        <span className="text-xs font-mono text-gray-600 shrink-0 w-9">
-          {fmt(totalSec)}
-        </span>
+          className="absolute left-0 top-0 h-full bg-brand-500 rounded-full"
+          style={{ width: `${progress * 100}%` }}
+        />
       </div>
+      <span className="text-xs font-mono text-gray-600 shrink-0 w-9 tabular-nums">
+        {fmt(totalSec)}
+      </span>
+    </div>
+  );
 
-      {/* Row 2 — Speed + Sustain */}
-      <div className="flex flex-wrap items-center gap-3">
+  return (
+    <div
+      className={clsx(
+        "space-y-2",
+        "border-b border-surface-border pb-3 mb-0",
+        "md:border-b-0 md:border-t md:border-surface-border md:pt-1 md:pb-0",
+      )}
+    >
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-gray-600 shrink-0">Speed</span>
-          <div className="flex flex-wrap gap-0.5 bg-surface-3 rounded-xl p-0.5 border border-surface-border">
-            {SPEEDS.map(s => (
-              <button
-                key={s}
-                onClick={() => onSpeedChange(s)}
-                className={clsx(
-                  "px-2.5 sm:px-3 py-1 rounded-[9px] text-[11px] sm:text-xs font-semibold transition-all shrink-0",
-                  speed === s ? "bg-brand-600 text-white" : "text-gray-500 hover:text-gray-300",
-                )}
-              >
-                {s}x
-              </button>
-            ))}
+      {/* Phone: speed + pedal left, play + reset right; then scrubber */}
+      <div className="md:hidden flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-2 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {speedSelect}
+            {pedalBtn}
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            {resetBtn}
+            {playBtn}
           </div>
         </div>
+        {progressRow}
+      </div>
 
-        {hasSustain && (
-          <button
-            onClick={onSustainToggle}
-            title={sustainOn ? "Sustain pedal ON — click to disable" : "Sustain pedal OFF — click to enable"}
-            className={clsx(
-              "flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-medium transition-colors",
-              sustainOn
-                ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
-                : "bg-surface-3 border-surface-border text-gray-500 hover:text-gray-300",
-            )}
-          >
-            🎹 Pedal {sustainOn ? "On" : "Off"}
-          </button>
-        )}
-
+      {/* Desktop / tablet */}
+      <div className="hidden md:block space-y-2">
+        <div className="flex items-center gap-2">
+          {playBtn}
+          {resetBtn}
+          {progressRow}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex items-center gap-2 min-w-0">
+            <span className="text-xs text-gray-600 shrink-0">Speed</span>
+            <select
+              value={String(speed)}
+              onChange={e => {
+                const v = parseFloat(e.target.value);
+                if (SPEEDS.includes(v as Speed)) onSpeedChange(v as Speed);
+              }}
+              className={clsx(selectClass, "pl-3 pr-8")}
+              style={{ backgroundImage: chevronBg }}
+            >
+              {SPEEDS.map(s => (
+                <option key={s} value={String(s)}>
+                  {s === 1 ? "1× (normal)" : `${s}×`}
+                </option>
+              ))}
+            </select>
+          </label>
+          {hasSustain && (
+            <button
+              type="button"
+              onClick={onSustainToggle}
+              title={sustainOn ? "Sustain pedal ON — click to disable" : "Sustain pedal OFF — click to enable"}
+              className={clsx(
+                "flex items-center gap-1 px-1.5 py-0.5 rounded-md border text-[10px] font-medium transition-colors",
+                sustainOn
+                  ? "bg-amber-500/15 border-amber-500/30 text-amber-400 hover:bg-amber-500/25"
+                  : "bg-surface-3 border-surface-border text-gray-500 hover:text-gray-300",
+              )}
+            >
+              🎹 Pedal {sustainOn ? "On" : "Off"}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

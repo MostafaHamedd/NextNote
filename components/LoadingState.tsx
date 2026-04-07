@@ -7,7 +7,7 @@ const STEPS = [
   { label: "Detecting key & tempo...", detail: "Running chromagram analysis" },
   { label: "Identifying chords...", detail: "CQT chroma matching" },
   { label: "Analyzing sonic feel...", detail: "Spectral & RMS analysis" },
-  { label: "Consulting the producer brain...", detail: "GPT-4o generating feedback" },
+  { label: "Finalizing analysis...", detail: "Building your results" },
 ];
 
 export default function LoadingState() {
