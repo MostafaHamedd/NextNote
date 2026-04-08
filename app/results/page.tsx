@@ -1,19 +1,45 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Music2 } from "lucide-react";
 import AnalysisResult from "@/components/AnalysisResult";
 import { resultStore } from "@/lib/resultStore";
+import { authHeaders } from "@/lib/auth";
 
-export default function ResultsPage() {
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+function ResultsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get("session");
+
   const [data, setData] = useState<{ analysis: any; feedback: any } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [label, setLabel] = useState("");
+  const [loadError, setLoadError] = useState(false);
 
   useEffect(() => {
+    if (sessionId) {
+      // Restore from server session
+      fetch(`${API_URL}/sessions/guitar/${sessionId}`, { headers: authHeaders() })
+        .then((r) => {
+          if (!r.ok) throw new Error();
+          return r.json();
+        })
+        .then((s) => {
+          setData({ analysis: s.analysis, feedback: s.feedback });
+          setLabel(s.label);
+        })
+        .catch(() => {
+          setLoadError(true);
+          router.replace("/library");
+        });
+      return;
+    }
+
+    // Fall back to in-memory store (fresh analysis or local history restore)
     const stored = resultStore.get();
     if (!stored) {
       router.replace("/analyze");
@@ -28,9 +54,9 @@ export default function ResultsPage() {
       setAudioUrl(url);
       return () => URL.revokeObjectURL(url);
     }
-  }, [router]);
+  }, [router, sessionId]);
 
-  if (!data) return null;
+  if (loadError || !data) return null;
 
   return (
     <div className="min-h-screen bg-surface relative overflow-hidden">
@@ -51,11 +77,11 @@ export default function ResultsPage() {
         {/* Back + file label row */}
         <div className="flex items-center justify-between mb-6">
           <Link
-            href="/analyze"
+            href={sessionId ? "/library" : "/analyze"}
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-300 transition-colors"
           >
             <ArrowLeft size={14} />
-            Guitar → Piano
+            {sessionId ? "Library" : "Guitar → Piano"}
           </Link>
           {label && (
             <div className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -87,5 +113,13 @@ export default function ResultsPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense>
+      <ResultsContent />
+    </Suspense>
   );
 }

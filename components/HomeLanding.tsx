@@ -1,9 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Zap, Guitar, Piano, ArrowRight } from "lucide-react";
+import { Zap, Guitar, Piano, ArrowRight, Library, Wand2 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
 
 export default function HomeLanding() {
+  const { user } = useAuth();
+
   return (
     <div className="min-h-screen bg-surface relative overflow-hidden flex flex-col">
       <div
@@ -31,6 +34,23 @@ export default function HomeLanding() {
         </p>
 
         <div className="w-full space-y-3 sm:space-y-4">
+          {/* Library card — only for logged-in users */}
+          {user && (
+            <Link
+              href="/library"
+              className="group flex items-center gap-4 w-full glass rounded-2xl border border-brand-500/30 p-4 sm:p-5 text-left transition-all hover:border-brand-400/50 hover:bg-brand-500/5"
+            >
+              <div className="p-3 rounded-xl bg-brand-600/20 text-brand-400 shrink-0">
+                <Library size={22} strokeWidth={1.75} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-white text-sm sm:text-base">My Library</p>
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Your saved sessions and account overview</p>
+              </div>
+              <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
+            </Link>
+          )}
+
           <Link
             href="/analyze"
             className="group flex items-center gap-4 w-full glass rounded-2xl border border-surface-border p-4 sm:p-5 text-left transition-all hover:border-brand-500/40 hover:bg-brand-500/5"
@@ -58,6 +78,29 @@ export default function HomeLanding() {
             </div>
             <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
           </Link>
+
+          <Link
+            href="/producer"
+            className="group flex items-center gap-4 w-full glass rounded-2xl border border-surface-border p-4 sm:p-5 text-left transition-all hover:border-brand-500/40 hover:bg-brand-500/5"
+          >
+            <div className="p-3 rounded-xl bg-purple-600/15 text-purple-400 shrink-0">
+              <Wand2 size={22} strokeWidth={1.75} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-white text-sm sm:text-base">Producer Intelligence</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Melody MIDI export for Logic Pro from any audio</p>
+            </div>
+            <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
+          </Link>
+
+          {!user && (
+            <Link
+              href="/login?next=/library"
+              className="text-sm text-gray-600 hover:text-brand-400 transition-colors pt-2 block"
+            >
+              Sign in to save your sessions →
+            </Link>
+          )}
         </div>
       </main>
 

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { getCurrentUser, ANON_SESSIONS_KEY } from "@/lib/auth";
 
-const STORAGE_KEY = "music-assistant-sessions";
 const MAX_SESSIONS = 20;
 
 /** IDs for local history; avoids crypto.randomUUID() (missing on some mobile WebViews). */
@@ -36,21 +36,30 @@ export interface Session {
 export function useSessionHistory() {
   const [sessions, setSessions] = useState<Session[]>([]);
 
+  // Recompute on every render — reflects live auth state without needing context
+  const loggedIn = typeof window !== "undefined" && getCurrentUser() !== null;
+
   useEffect(() => {
+    if (loggedIn) {
+      // Clear any locally loaded sessions — server is the source of truth when authed
+      setSessions([]);
+      return;
+    }
     try {
-      const raw = localStorage.getItem(STORAGE_KEY);
+      const raw = localStorage.getItem(ANON_SESSIONS_KEY);
       if (raw) setSessions(JSON.parse(raw));
     } catch {}
-  }, []);
+  }, [loggedIn]);
 
   const persist = (updated: Session[]) => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+      localStorage.setItem(ANON_SESSIONS_KEY, JSON.stringify(updated));
     } catch {}
   };
 
   const saveSession = useCallback(
     (session: Omit<Session, "id" | "timestamp">) => {
+      if (loggedIn) return; // server persists via /analyze when Bearer is sent
       const entry: Session = {
         ...session,
         id: newSessionId(),
@@ -62,23 +71,25 @@ export function useSessionHistory() {
         return updated;
       });
     },
-    []
+    [loggedIn]
   );
 
   const deleteSession = useCallback((id: string) => {
+    if (loggedIn) return;
     setSessions((prev) => {
       const updated = prev.filter((s) => s.id !== id);
       persist(updated);
       return updated;
     });
-  }, []);
+  }, [loggedIn]);
 
   const clearAll = useCallback(() => {
+    if (loggedIn) return;
     setSessions([]);
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(ANON_SESSIONS_KEY);
     } catch {}
-  }, []);
+  }, [loggedIn]);
 
   return { sessions, saveSession, deleteSession, clearAll };
 }

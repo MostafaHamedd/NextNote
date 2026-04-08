@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { Music, BookOpen, Music2 } from "lucide-react";
 import clsx from "clsx";
 import { sheetStore } from "@/lib/sheetStore";
-import LearnSongTab   from "@/components/sheet/LearnSongTab";
-import MidiUploadTab  from "@/components/sheet/MidiUploadTab";
-import LoadingCard    from "@/components/ui/LoadingCard";
-import ErrorBanner    from "@/components/ui/ErrorBanner";
+import LearnSongTab from "@/components/sheet/LearnSongTab";
+import MidiUploadTab from "@/components/sheet/MidiUploadTab";
+import LoadingCard from "@/components/ui/LoadingCard";
+import ErrorBanner from "@/components/ui/ErrorBanner";
+import { useFreeAttempts } from "@/hooks/useFreeAttempts";
+import { authHeaders } from "@/lib/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -16,16 +18,17 @@ type Tab = "learn" | "midi";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
   { id: "learn", label: "Piano Visualizer", icon: BookOpen },
-  { id: "midi",  label: "Upload MIDI",      icon: Music2   },
+  { id: "midi", label: "Upload MIDI", icon: Music2 },
 ];
 
 export default function VisualizerPage() {
   const router = useRouter();
-  const [tab, setTab]           = useState<Tab>("learn");
-  const [loading, setLoading]   = useState(false);
+  const [tab, setTab] = useState<Tab>("learn");
+  const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState("");
-  const [error, setError]       = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [pendingMidi, setPendingMidi] = useState<File | null>(null);
+  const { checkAccess, recordUsage } = useFreeAttempts();
 
   const navigateToPlay = (data: object) => {
     sheetStore.set(data as any);
@@ -33,13 +36,15 @@ export default function VisualizerPage() {
   };
 
   const handleLearnSong = async (title: string) => {
+    if (!checkAccess("/visualizer")) return;
+
     setLoading(true);
     setError(null);
     setProgress(`Searching MIDI for "${title}"…`);
     try {
       const res = await fetch(`${API_URL}/learn-song`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...authHeaders() },
         body: JSON.stringify({ title }),
       });
       if (!res.ok) {
@@ -48,6 +53,7 @@ export default function VisualizerPage() {
       }
       const data = await res.json();
       if (!data.notes?.length) throw new Error("No notes returned. Try a more specific title.");
+      recordUsage();
       navigateToPlay(data);
     } catch (e: any) {
       setError(e.message || "Something went wrong.");
@@ -59,19 +65,26 @@ export default function VisualizerPage() {
 
   const handleMidiUpload = async () => {
     if (!pendingMidi) return;
+    if (!checkAccess("/visualizer")) return;
+
     setLoading(true);
     setError(null);
     setProgress("Parsing MIDI file…");
     try {
       const form = new FormData();
       form.append("file", pendingMidi);
-      const res = await fetch(`${API_URL}/upload-midi`, { method: "POST", body: form });
+      const res = await fetch(`${API_URL}/upload-midi`, {
+        method: "POST",
+        headers: authHeaders(),
+        body: form,
+      });
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.detail || `Server error: ${res.status}`);
       }
       const data = await res.json();
       if (!data.notes?.length) throw new Error("No notes found in this MIDI file.");
+      recordUsage();
       navigateToPlay(data);
     } catch (e: any) {
       setError(e.message || "Something went wrong.");

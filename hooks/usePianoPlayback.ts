@@ -13,6 +13,7 @@ const        SCHED_INTERVAL = 40;
 export interface PlaybackHandle {
   playing:         boolean;
   progress:        number;
+  scoreTimeSec:    number;
   speed:           Speed;
   sustainOn:       boolean;
   activeNotes:     Map<string, "left" | "right">;
@@ -31,6 +32,7 @@ export function usePianoPlayback(
 ): PlaybackHandle {
   const [playing, setPlaying]       = useState(false);
   const [progress, setProgress]     = useState(0);
+  const [scoreTimeSec, setScoreTimeSec] = useState(0);
   const [speed, setSpeed]           = useState<Speed>(1);
   const [sustainOn, setSustainOn]   = useState(hasSustain);
   const [activeNotes, setActiveNotes] = useState<Map<string, "left" | "right">>(new Map());
@@ -107,6 +109,7 @@ export function usePianoPlayback(
     const total      = totalSecRef.current;
 
     setProgress(Math.min(1, currentSec / total));
+    setScoreTimeSec(currentSec);
     setActiveNotes(activeNotesAtSec(currentSec));
 
     if (currentSec < total) {
@@ -130,6 +133,7 @@ export function usePianoPlayback(
     nextSchedIdxRef.current = idx;
     playStartRef.current    = performance.now();
     secOffsetRef.current    = fromSec;
+    setScoreTimeSec(fromSec);
 
     const ctx = samplerRef.current.audioCtxRef.current;
     if (ctx?.state === "suspended") ctx.resume();
@@ -149,6 +153,7 @@ export function usePianoPlayback(
       secOffsetRef.current += elapsed * speedRef.current;
       setPlaying(false);
       setProgress(Math.min(1, secOffsetRef.current / totalSecRef.current));
+      setScoreTimeSec(secOffsetRef.current);
       setActiveNotes(activeNotesAtSec(secOffsetRef.current));
     } else {
       startFrom(secOffsetRef.current);
@@ -164,6 +169,7 @@ export function usePianoPlayback(
     secOffsetRef.current = 0;
     setPlaying(false);
     setProgress(0);
+    setScoreTimeSec(0);
     setActiveNotes(new Map());
   }, []);
 
@@ -178,6 +184,7 @@ export function usePianoPlayback(
       startFrom(sec);
     } else {
       secOffsetRef.current = sec;
+      setScoreTimeSec(sec);
       setActiveNotes(activeNotesAtSec(sec));
     }
   }, [playing, startFrom, activeNotesAtSec]);
@@ -200,7 +207,7 @@ export function usePianoPlayback(
   }, []);
 
   return {
-    playing, progress, speed, sustainOn, activeNotes,
+    playing, progress, scoreTimeSec, speed, sustainOn, activeNotes,
     handlePlay, handleReset, handleSeek, setSpeed, setSustainOn,
   };
 }

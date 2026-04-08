@@ -1,14 +1,24 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { SheetData } from "@/lib/sheetStore";
 import { normalisePitch, pitchToMidi, buildKeys } from "@/lib/pianoUtils";
 import { usePianoSampler } from "@/hooks/usePianoSampler";
 import { usePianoPlayback } from "@/hooks/usePianoPlayback";
 import PianoKeyboard from "@/components/piano/PianoKeyboard";
 import PlayerControls from "@/components/piano/PlayerControls";
+import FallingNotesLane from "@/components/piano/FallingNotesLane";
 
 export default function SynthesiaView({ data }: { data: SheetData }) {
+  const [showLane, setShowLane] = useState(true);
+  const [tutorialDismissed, setTutorialDismissed] = useState(false);
+
+  // Auto-dismiss tutorial hint after 4 s
+  useEffect(() => {
+    const t = setTimeout(() => setTutorialDismissed(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
   // Pre-process notes once
   const sortedNotes = useMemo(() =>
     data.notes
@@ -55,17 +65,57 @@ export default function SynthesiaView({ data }: { data: SheetData }) {
             <span className="w-3 h-3 rounded-sm bg-brand-500 inline-block" />
             Right hand
           </span>
+          {/* Falling-lane toggle with tutorial pulse */}
+          <div className="relative ml-1">
+            <button
+              onClick={() => { setShowLane(v => !v); setTutorialDismissed(true); }}
+              className={[
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all",
+                showLane
+                  ? "bg-brand-500/20 border-brand-500/50 text-brand-300 hover:bg-brand-500/30"
+                  : "bg-surface-border/40 border-surface-border text-gray-400 hover:text-white hover:border-gray-500",
+              ].join(" ")}
+            >
+              {/* Toggle pill */}
+              <span
+                className={[
+                  "w-6 h-3.5 rounded-full flex items-center transition-all duration-200",
+                  showLane ? "bg-brand-500 justify-end pr-0.5" : "bg-gray-600 justify-start pl-0.5",
+                ].join(" ")}
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-white block" />
+              </span>
+              Falling notes
+            </button>
+            {/* Tutorial pulse ring — fades after 4 s */}
+            {!tutorialDismissed && (
+              <span className="absolute inset-0 rounded-full animate-ping bg-brand-400/30 pointer-events-none" />
+            )}
+          </div>
         </div>
       </div>
 
       {/* Mobile: controls above piano; md+: piano then controls */}
       <div className="flex flex-col-reverse gap-4 md:flex-col">
-        <PianoKeyboard
-          whiteKeys={whiteKeys}
-          blackKeys={blackKeys}
-          pianoW={pianoW}
-          activeNotes={playback.activeNotes}
-        />
+        {/* Falling notes lane + keyboard stacked with no gap between */}
+        <div className="flex flex-col">
+          {showLane && (
+            <FallingNotesLane
+              sortedNotes={sortedNotes}
+              whiteKeys={whiteKeys}
+              blackKeys={blackKeys}
+              pianoW={pianoW}
+              scoreTimeSec={playback.scoreTimeSec}
+              sustainOn={playback.sustainOn}
+            />
+          )}
+          <PianoKeyboard
+            whiteKeys={whiteKeys}
+            blackKeys={blackKeys}
+            pianoW={pianoW}
+            activeNotes={playback.activeNotes}
+          />
+        </div>
         <PlayerControls
           playing={playback.playing}
           samplerReady={sampler.samplerReady}

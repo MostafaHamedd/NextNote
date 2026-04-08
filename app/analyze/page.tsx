@@ -1,14 +1,16 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Mic, Upload, Zap } from "lucide-react";
+import { Mic, Upload, Zap, Lock } from "lucide-react";
 import clsx from "clsx";
 import AudioRecorder from "@/components/AudioRecorder";
 import FileUpload from "@/components/FileUpload";
 import LoadingState from "@/components/LoadingState";
 import { useSessionHistory } from "@/hooks/useSessionHistory";
 import { resultStore } from "@/lib/resultStore";
+import { useFreeAttempts } from "@/hooks/useFreeAttempts";
+import { authHeaders } from "@/lib/auth";
 
 type Tab = "record" | "upload";
 
@@ -19,11 +21,14 @@ export default function AnalyzePage() {
   const [tab, setTab] = useState<Tab>("record");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
   const { saveSession } = useSessionHistory();
+  const { remaining, checkAccess, recordUsage } = useFreeAttempts();
 
   const analyzeAudio = useCallback(
     async (audioData: Blob | File, label?: string) => {
+      // Gate: check free attempts before calling API
+      if (!checkAccess("/analyze")) return;
+
       setIsAnalyzing(true);
       setError(null);
 
@@ -38,6 +43,7 @@ export default function AnalyzePage() {
 
         const res = await fetch(`${API_URL}/analyze`, {
           method: "POST",
+          headers: authHeaders(),
           body: form,
         });
 
@@ -47,6 +53,9 @@ export default function AnalyzePage() {
         }
 
         const data = await res.json();
+
+        // Record usage after a successful analysis
+        recordUsage();
 
         const resolvedLabel =
           label ?? (audioData instanceof File ? audioData.name : "Recording");
@@ -75,7 +84,7 @@ export default function AnalyzePage() {
         setIsAnalyzing(false);
       }
     },
-    [saveSession, router],
+    [saveSession, router, checkAccess, recordUsage]
   );
 
   return (
@@ -108,6 +117,17 @@ export default function AnalyzePage() {
           <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
             Record or upload your guitar idea. Get chord detection, key, tempo, and sonic stats — producer insights coming soon.
           </p>
+
+          {/* Free attempt indicator (anonymous only) */}
+          {remaining > 0 && remaining <= 3 && (
+            <div className="inline-flex items-center gap-2 mt-4 bg-surface-3/60 border border-surface-border rounded-full px-4 py-1.5">
+              <Lock size={12} className="text-gray-500" />
+              <span className="text-xs text-gray-400">
+                {remaining} free {remaining === 1 ? "analysis" : "analyses"} remaining —{" "}
+                <a href="/login" className="text-brand-400 hover:underline">sign in</a> for unlimited
+              </span>
+            </div>
+          )}
         </div>
 
         <div className="max-w-xl mx-auto glass rounded-3xl p-6 sm:p-8 shadow-2xl shadow-black/40 mb-8">

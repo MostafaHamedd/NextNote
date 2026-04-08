@@ -2,38 +2,31 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, PlusCircle, Music, Clock } from "lucide-react";
+import { Home, Clock, LogIn, Library } from "lucide-react";
 import clsx from "clsx";
+import { useAuth } from "@/context/AuthContext";
 
-const LINKS = [
-  {
-    href: "/",
-    label: "Home",
-    icon: Home,
-    active: (p: string) => p === "/",
-  },
-  {
-    href: "/analyze",
-    label: "Guitar→Piano",
-    icon: PlusCircle,
-    active: (p: string) => p === "/analyze" || p === "/results",
-  },
-  {
-    href: "/visualizer",
-    label: "Visualizer",
-    icon: Music,
-    active: (p: string) => p.startsWith("/visualizer"),
-  },
-] as const;
+const PLAN_AVATAR_BG: Record<string, string> = {
+  free: "bg-gray-700",
+  pro: "bg-brand-700",
+  studio: "bg-amber-700",
+};
+
+function getInitials(email: string) {
+  return email.split("@")[0].slice(0, 2).toUpperCase();
+}
 
 export default function MobileNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   const openHistory = () => {
     if (typeof window !== "undefined") {
       window.dispatchEvent(new Event("open-history"));
     }
   };
+
+  const isAccountActive = pathname === "/account" || pathname === "/login" || pathname === "/pricing";
 
   return (
     <nav
@@ -43,30 +36,74 @@ export default function MobileNav() {
         "pb-[env(safe-area-inset-bottom)]"
       )}
     >
-      {LINKS.map(({ href, label, icon: Icon, active }) => (
-        <Link
-          key={href}
-          href={href}
-          className={clsx(
-            "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
-            active(pathname)
-              ? "text-brand-400"
-              : "text-gray-500 hover:text-gray-300"
-          )}
-        >
-          <Icon size={22} strokeWidth={1.6} />
-          {label}
-        </Link>
-      ))}
-
-      {/* History — opens the sidebar via DOM event */}
-      <button
-        onClick={openHistory}
-        className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium text-gray-500 hover:text-gray-300 transition-colors"
+      {/* Home — always first */}
+      <Link
+        href="/"
+        className={clsx(
+          "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
+          pathname === "/" ? "text-brand-400" : "text-gray-500 hover:text-gray-300"
+        )}
       >
-        <Clock size={22} strokeWidth={1.6} />
-        History
-      </button>
+        <Home size={22} strokeWidth={1.6} />
+        Home
+      </Link>
+
+      {user ? (
+        <>
+          {/* Logged-in: Home · Library · Analyze · Visualizer · Account */}
+          <Link
+            href="/library"
+            className={clsx(
+              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
+              pathname === "/library" ? "text-brand-400" : "text-gray-500 hover:text-gray-300"
+            )}
+          >
+            <Library size={22} strokeWidth={1.6} />
+            Library
+          </Link>
+
+          <Link
+            href="/account"
+            className={clsx(
+              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
+              isAccountActive ? "text-brand-400" : "text-gray-500 hover:text-gray-300"
+            )}
+          >
+            <div
+              className={clsx(
+                "w-6 h-6 rounded-lg flex items-center justify-center text-white text-[10px] font-bold",
+                isAccountActive ? "ring-2 ring-brand-400" : "",
+                PLAN_AVATAR_BG[user.plan] ?? PLAN_AVATAR_BG.free
+              )}
+            >
+              {getInitials(user.email)}
+            </div>
+            Account
+          </Link>
+        </>
+      ) : (
+        <>
+          {/* Anonymous: Home · History · Sign In */}
+          <button
+            onClick={openHistory}
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            <Clock size={22} strokeWidth={1.6} />
+            History
+          </button>
+
+          <Link
+            href="/login"
+            className={clsx(
+              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
+              pathname === "/login" ? "text-brand-400" : "text-gray-500 hover:text-gray-300"
+            )}
+          >
+            <LogIn size={22} strokeWidth={1.6} />
+            Sign In
+          </Link>
+        </>
+      )}
     </nav>
   );
 }
