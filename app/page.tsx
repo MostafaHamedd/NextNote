@@ -4,7 +4,7 @@ import HomeLanding from "@/components/HomeLanding";
 export const metadata: Metadata = {
   title: "NextNote — Home",
   description:
-    "Practice smarter: guitar chords and keys from recordings, plus a piano visualizer for MIDI and songs.",
+    "Guitar chords, key, and tempo from recordings—export your progression as MIDI for Logic Pro and other DAWs. Piano visualizer for MIDI and songs.",
 };
 
 export default function HomePage() {

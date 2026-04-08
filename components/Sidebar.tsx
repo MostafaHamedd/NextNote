@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Clock, Crown, LogIn, Zap, Library, Wand2 } from "lucide-react";
+import { Clock, Crown, LogIn, Zap, Library, Wand2, PlusCircle, Music } from "lucide-react";
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import HistorySidebar from "@/components/HistorySidebar";
@@ -60,7 +60,7 @@ export default function Sidebar() {
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
           {user ? (
             <>
-              {/* Logged-in order: Library first */}
+              {/* Logged-in order: Library + sub-links, then tools */}
               <Link
                 href="/library"
                 className={clsx(
@@ -74,18 +74,45 @@ export default function Sidebar() {
                 Library
               </Link>
 
-              <Link
-                href="/producer"
-                className={clsx(
-                  "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                  pathname === "/producer"
-                    ? "bg-brand-600 text-white"
-                    : "text-gray-400 hover:text-white hover:bg-surface-3"
-                )}
-              >
-                <Wand2 size={15} />
-                Producer
-              </Link>
+              {/* Sub-links under Library */}
+              <div className="pl-3 space-y-0.5">
+                <Link
+                  href="/analyze"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/analyze" || pathname === "/results"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <PlusCircle size={12} />
+                  Guitar → Piano
+                </Link>
+                <Link
+                  href="/visualizer"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/visualizer" || pathname === "/visualizer/play"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <Music size={12} />
+                  Visualizer
+                </Link>
+                <Link
+                  href="/producer"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/producer"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <Wand2 size={12} />
+                  Producer
+                </Link>
+              </div>
 
               <Link
                 href="/pricing"

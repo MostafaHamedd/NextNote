@@ -105,7 +105,7 @@ export default function AnalyzePage() {
         <div className="max-w-2xl mx-auto text-center mb-12">
           <div className="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-4 py-1.5 mb-6">
             <Zap size={14} className="text-brand-400" />
-            <span className="text-sm font-medium text-brand-300">Chord &amp; tempo analysis</span>
+            <span className="text-sm font-medium text-brand-300">Chords, MIDI export &amp; tempo</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-bold mb-4 leading-tight">
@@ -115,7 +115,7 @@ export default function AnalyzePage() {
             Producer Brain<br />for Guitarists
           </p>
           <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
-            Record or upload your guitar idea. Get chord detection, key, tempo, and sonic stats — producer insights coming soon.
+            Record or upload your guitar idea. Get chords, key, tempo, and a piano view—then download MIDI of the chord progression for Logic Pro or any DAW.
           </p>
 
           {/* Free attempt indicator (anonymous only) */}
@@ -182,7 +182,7 @@ export default function AnalyzePage() {
         )}
 
         <footer className="mt-16 text-center text-sm text-gray-600">
-          <p>NextNote — Producer Brain for Guitarists</p>
+          <p>NextNote — Chords, piano view &amp; MIDI for your DAW</p>
         </footer>
       </div>
     </div>

@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Music, Zap, Lightbulb, Star, ArrowRight,
-  Sparkles, Tag, Piano, Loader2,
+  Sparkles, Tag, Piano, Loader2, Download,
 } from "lucide-react";
 import clsx from "clsx";
 import PianoView, { ChordData } from "@/components/PianoView";
@@ -113,6 +113,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
   const [pianoLoading, setPianoLoading] = useState(false);
   const [pianoError, setPianoError] = useState<string | null>(null);
   const [showPiano, setShowPiano] = useState(false);
+  const [midiDownloading, setMidiDownloading] = useState(false);
   const pianoSectionRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -161,6 +162,37 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
       setPianoLoading(false);
     }
   }, [pianoData, analysis]);
+
+  const handleDownloadMidi = useCallback(async () => {
+    setMidiDownloading(true);
+    try {
+      const res = await fetch(`${API_URL}/piano-midi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chord_sequence: analysis.chord_sequence ?? analysis.chords,
+          bpm: analysis.bpm,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const { midi_b64 } = await res.json();
+      const binary = atob(midi_b64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const url = URL.createObjectURL(new Blob([bytes], { type: "audio/midi" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${analysis.key}_${analysis.mode}_${analysis.bpm}bpm_piano.mid`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      // silently ignore — user can retry
+    } finally {
+      setMidiDownloading(false);
+    }
+  }, [analysis]);
 
   return (
     <div className="space-y-4">
@@ -228,28 +260,43 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
               </div>
             </div>
 
-            {/* View on Piano button */}
-            <button
-              onClick={handleViewOnPiano}
-              disabled={pianoLoading}
-              className={clsx(
-                "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all",
-                showPiano && pianoData
-                  ? "bg-brand-600/30 text-brand-300 border-brand-500/50"
-                  : "bg-surface-3 text-gray-400 border-surface-border hover:text-brand-300 hover:border-brand-500/40 hover:bg-brand-500/10"
-              )}
-            >
-              {pianoLoading ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Piano size={14} />
-              )}
-              {pianoLoading
-                ? "Loading piano..."
-                : showPiano && pianoData
-                ? "Hide Piano"
-                : "View on Piano"}
-            </button>
+            {/* View on Piano + Download MIDI buttons */}
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={handleViewOnPiano}
+                disabled={pianoLoading}
+                className={clsx(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all",
+                  showPiano && pianoData
+                    ? "bg-brand-600/30 text-brand-300 border-brand-500/50"
+                    : "bg-surface-3 text-gray-400 border-surface-border hover:text-brand-300 hover:border-brand-500/40 hover:bg-brand-500/10"
+                )}
+              >
+                {pianoLoading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Piano size={14} />
+                )}
+                {pianoLoading
+                  ? "Loading piano..."
+                  : showPiano && pianoData
+                  ? "Hide Piano"
+                  : "View on Piano"}
+              </button>
+
+              <button
+                onClick={handleDownloadMidi}
+                disabled={midiDownloading}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-60"
+              >
+                {midiDownloading ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Download size={14} />
+                )}
+                {midiDownloading ? "Generating…" : "Download Piano MIDI"}
+              </button>
+            </div>
 
             {pianoError && (
               <p className="text-xs text-red-400 mt-2">{pianoError}</p>

@@ -92,7 +92,7 @@ export default function HistorySidebar({
               <div>
                 <p className="text-gray-400 font-medium">No sessions yet</p>
                 <p className="text-gray-600 text-sm mt-1">
-                  Record guitar — we’ll detect chords and key for piano view.
+                  Record guitar — chords, key, and piano view; export MIDI on the results page.
                 </p>
               </div>
             </div>

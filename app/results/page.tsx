@@ -109,7 +109,7 @@ function ResultsContent() {
         <AnalysisResult analysis={data.analysis} feedback={data.feedback} />
 
         <footer className="mt-16 text-center text-sm text-gray-600">
-          <p>NextNote — Producer Brain for Guitarists</p>
+          <p>NextNote — Chords, piano view &amp; MIDI for your DAW</p>
         </footer>
       </div>
     </div>

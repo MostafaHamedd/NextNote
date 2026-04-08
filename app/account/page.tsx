@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import RequireAuth from "@/components/RequireAuth";
 import {
   User,
   Shield,
@@ -127,7 +128,7 @@ function Toast({ message, type }: { message: string; type: "success" | "error" }
   );
 }
 
-export default function AccountPage() {
+function AccountContent() {
   const { user, logout } = useAuth();
   const router = useRouter();
 
@@ -141,9 +142,6 @@ export default function AccountPage() {
   const [notifs, setNotifs] = useState({ product: true, billing: true, tips: false });
   const [autoPlay, setAutoPlay] = useState(false);
 
-  useEffect(() => {
-    if (!user) router.replace("/login?next=/account");
-  }, [user, router]);
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
@@ -188,7 +186,7 @@ export default function AccountPage() {
     showToast("Account deletion is not yet available. Contact support.", "error");
   };
 
-  if (!user) return null;
+  if (!user) return null; // TypeScript narrowing — RequireAuth prevents this
 
   const plan = PLAN_INFO[user.plan] ?? PLAN_INFO.free;
 
@@ -492,5 +490,13 @@ export default function AccountPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function AccountPage() {
+  return (
+    <RequireAuth>
+      <AccountContent />
+    </RequireAuth>
   );
 }

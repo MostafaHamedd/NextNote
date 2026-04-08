@@ -30,7 +30,7 @@ export default function HomeLanding() {
           Practice smarter.
         </h1>
         <p className="text-gray-400 text-base sm:text-lg leading-relaxed mb-12 max-w-sm">
-          Turn guitar ideas into chords and keys, or learn pieces on the piano keyboard — in one place.
+          Turn guitar recordings into chords, keys, and a playable piano view—then export MIDI for Logic Pro or any DAW. Piano visualizer for MIDI and songs, too.
         </p>
 
         <div className="w-full space-y-3 sm:space-y-4">
@@ -60,7 +60,9 @@ export default function HomeLanding() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-semibold text-white text-sm sm:text-base">Guitar → Piano</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Chords, tempo &amp; key from a recording</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
+                Chords, tempo &amp; key—export chord MIDI for your DAW
+              </p>
             </div>
             <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
           </Link>

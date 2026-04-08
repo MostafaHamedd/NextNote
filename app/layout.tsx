@@ -5,8 +5,9 @@ import MobileNav from "@/components/MobileNav";
 import ClientProviders from "@/components/ClientProviders";
 
 export const metadata: Metadata = {
-  title: "NextNote — Producer Brain for Guitarists",
-  description: "Record your guitar idea for chord detection, tempo, and piano visualizer practice",
+  title: "NextNote — Guitar chords, piano view & MIDI",
+  description:
+    "Chord and key detection from guitar recordings, piano keyboard view, and MIDI export for your DAW.",
 };
 
 export default function RootLayout({

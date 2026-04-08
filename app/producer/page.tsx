@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Upload, Wand2, Zap } from "lucide-react";
 import clsx from "clsx";
 import FileUpload from "@/components/FileUpload";
 import ProducerResult, { type ProducerData } from "@/components/ProducerResult";
 import { authHeaders } from "@/lib/auth";
+import RequireAuth from "@/components/RequireAuth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 type Grid = "1/8" | "1/16";
 
-export default function ProducerPage() {
+function ProducerPageInner() {
+  const searchParams = useSearchParams();
+  const sessionId = searchParams.get("session");
+
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ProducerData | null>(null);
   const [filename, setFilename] = useState("audio");
@@ -21,6 +26,22 @@ export default function ProducerPage() {
   // Options
   const [snapToKey, setSnapToKey] = useState(false);
   const [grid, setGrid] = useState<Grid>("1/16");
+
+  useEffect(() => {
+    if (!sessionId) return;
+    setIsAnalyzing(true);
+    fetch(`${API_URL}/sessions/producer/${sessionId}`, { headers: authHeaders() })
+      .then((r) => {
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((data) => {
+        setResult(data.result);
+        setFilename(data.title);
+      })
+      .catch(() => setError("Could not load session."))
+      .finally(() => setIsAnalyzing(false));
+  }, [sessionId]);
 
   const handleFile = useCallback(async (file: File) => {
     setIsAnalyzing(true);
@@ -205,5 +226,21 @@ export default function ProducerPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+function ProducerPage() {
+  return (
+    <Suspense>
+      <ProducerPageInner />
+    </Suspense>
+  );
+}
+
+export default function ProducerPageRoute() {
+  return (
+    <RequireAuth>
+      <ProducerPage />
+    </RequireAuth>
   );
 }

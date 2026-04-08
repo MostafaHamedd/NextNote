@@ -23,6 +23,7 @@ const PLANS = [
       "Guitar → Piano analysis",
       "Chord & key detection",
       "BPM & tempo analysis",
+      "Export guitar chords as MIDI (DAW-ready)",
       "Session history (20 saves)",
     ],
     missing: [
@@ -222,7 +223,7 @@ export default function PricingPage() {
 
         {/* Footer note */}
         <p className="text-center text-xs text-gray-600 mt-12 leading-relaxed">
-          All plans include access to chord detection, BPM analysis, and key detection.
+          All plans include chord detection, BPM and key analysis, and guitar-to-MIDI export from your chord progression.
           <br />
           Prices are in USD. Cancel anytime.{" "}
           <Link href="/login" className="text-brand-400/70 hover:text-brand-300">

@@ -12,16 +12,19 @@ import {
   ArrowRight,
   Zap,
   PlusCircle,
+  Wand2,
+  Trash2,
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuth } from "@/context/AuthContext";
 import { authHeaders } from "@/lib/auth";
 import { sheetStore } from "@/lib/sheetStore";
 import { resultStore } from "@/lib/resultStore";
+import RequireAuth from "@/components/RequireAuth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-type Tab = "overview" | "guitar" | "visualizer";
+type Tab = "overview" | "guitar" | "visualizer" | "producer";
 
 interface MeData {
   plan: "free" | "pro" | "studio";
@@ -38,6 +41,12 @@ interface VisualizerCard {
   id: number;
   title: string;
   source: "learn" | "midi";
+  created_at: string;
+}
+
+interface ProducerCard {
+  id: number;
+  title: string;
   created_at: string;
 }
 
@@ -78,72 +87,136 @@ function CtaCard({ href, icon: Icon, label, desc, accent = false }: {
   );
 }
 
-function SessionCard({ label, subtitle, icon: Icon, onClick, loading }: {
+function SessionCard({ label, subtitle, icon: Icon, onClick, onDelete, loading, deleting }: {
   label: string;
   subtitle: string;
   icon: React.ElementType;
   onClick: () => void;
+  onDelete?: () => void;
   loading?: boolean;
+  deleting?: boolean;
 }) {
   return (
-    <button
-      onClick={onClick}
-      disabled={loading}
-      className="group glass rounded-2xl p-5 text-left border border-surface-border hover:border-brand-500/40 transition-all hover:bg-surface-3/50 disabled:opacity-60 w-full"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="w-9 h-9 bg-brand-600/15 rounded-xl flex items-center justify-center shrink-0">
-          <Icon size={16} className="text-brand-400" />
+    <div className={clsx("group relative glass rounded-2xl border border-surface-border hover:border-brand-500/40 transition-all hover:bg-surface-3/50", deleting && "opacity-50 pointer-events-none")}>
+      <button
+        onClick={onClick}
+        disabled={loading || deleting}
+        className="w-full p-5 text-left disabled:opacity-60"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="w-9 h-9 bg-brand-600/15 rounded-xl flex items-center justify-center shrink-0">
+            <Icon size={16} className="text-brand-400" />
+          </div>
+          {loading ? (
+            <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mt-0.5 shrink-0" />
+          ) : (
+            <ArrowRight size={15} className="text-gray-600 group-hover:text-brand-400 transition-colors mt-0.5 shrink-0" />
+          )}
         </div>
-        {loading ? (
-          <div className="w-4 h-4 border-2 border-brand-500 border-t-transparent rounded-full animate-spin mt-0.5 shrink-0" />
-        ) : (
-          <ArrowRight size={15} className="text-gray-600 group-hover:text-brand-400 transition-colors mt-0.5 shrink-0" />
-        )}
-      </div>
-      <p className="text-white font-semibold text-sm mt-3 truncate">{label}</p>
-      <div className="flex items-center gap-1.5 mt-1.5">
-        <Clock size={11} className="text-gray-600" />
-        <p className="text-gray-500 text-xs">{subtitle}</p>
-      </div>
-    </button>
+        <p className="text-white font-semibold text-sm mt-3 truncate">{label}</p>
+        <div className="flex items-center gap-1.5 mt-1.5">
+          <Clock size={11} className="text-gray-600" />
+          <p className="text-gray-500 text-xs">{subtitle}</p>
+        </div>
+      </button>
+      {onDelete && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          className="absolute top-3 right-3 p-1.5 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
+          title="Delete"
+        >
+          <Trash2 size={13} />
+        </button>
+      )}
+    </div>
   );
 }
 
-export default function LibraryPage() {
-  const { user } = useAuth();
+function isMeData(x: unknown): x is MeData {
+  return (
+    typeof x === "object" &&
+    x !== null &&
+    "plan" in x &&
+    typeof (x as MeData).plan === "string" &&
+    ["free", "pro", "studio"].includes((x as MeData).plan) &&
+    "monthly_uses" in x &&
+    typeof (x as MeData).monthly_uses === "number"
+  );
+}
+
+async function parseJsonIfOk(res: Response): Promise<unknown | null> {
+  if (!res.ok) return null;
+  try {
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+function LibraryContent() {
+  const { user, token } = useAuth();
   const router = useRouter();
 
   const [tab, setTab] = useState<Tab>("overview");
   const [me, setMe] = useState<MeData | null>(null);
   const [guitarSessions, setGuitarSessions] = useState<GuitarCard[]>([]);
   const [visualizerSessions, setVisualizerSessions] = useState<VisualizerCard[]>([]);
+  const [producerSessions, setProducerSessions] = useState<ProducerCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [openingId, setOpeningId] = useState<number | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null); // "guitar-1" | "visualizer-2" | "producer-3"
 
   useEffect(() => {
-    if (!user) {
-      router.replace("/login?next=/library");
+    if (!token) {
+      setLoading(false);
       return;
     }
 
-    const headers = authHeaders();
-    Promise.all([
-      fetch(`${API_URL}/auth/me`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/sessions/guitar`, { headers }).then((r) => r.json()),
-      fetch(`${API_URL}/sessions/visualizer`, { headers }).then((r) => r.json()),
+    const headers: HeadersInit = { Authorization: `Bearer ${token}` };
+    setLoading(true);
+
+    Promise.allSettled([
+      fetch(`${API_URL}/auth/me`, { headers }).then(parseJsonIfOk),
+      fetch(`${API_URL}/sessions/guitar`, { headers }).then(parseJsonIfOk),
+      fetch(`${API_URL}/sessions/visualizer`, { headers }).then(parseJsonIfOk),
+      fetch(`${API_URL}/sessions/producer`, { headers }).then(parseJsonIfOk),
     ])
-      .then(([meData, guitar, visualizer]) => {
-        setMe(meData);
-        setGuitarSessions(Array.isArray(guitar) ? guitar : []);
-        setVisualizerSessions(Array.isArray(visualizer) ? visualizer : []);
+      .then((outcomes) => {
+        const meRaw = outcomes[0].status === "fulfilled" ? outcomes[0].value : null;
+        const guitarRaw = outcomes[1].status === "fulfilled" ? outcomes[1].value : null;
+        const visualizerRaw = outcomes[2].status === "fulfilled" ? outcomes[2].value : null;
+        const producerRaw = outcomes[3].status === "fulfilled" ? outcomes[3].value : null;
+
+        setMe(isMeData(meRaw) ? meRaw : null);
+        setGuitarSessions(Array.isArray(guitarRaw) ? guitarRaw : []);
+        setVisualizerSessions(Array.isArray(visualizerRaw) ? visualizerRaw : []);
+        setProducerSessions(Array.isArray(producerRaw) ? producerRaw : []);
       })
-      .catch(() => {})
       .finally(() => setLoading(false));
-  }, [user, router]);
+  }, [token]);
 
   const openGuitarSession = (id: number) => {
     router.push(`/results?session=${id}`);
+  };
+
+  const openProducerSession = (id: number) => {
+    router.push(`/producer?session=${id}`);
+  };
+
+  const deleteSession = async (type: "guitar" | "visualizer" | "producer", id: number) => {
+    const key = `${type}-${id}`;
+    setDeletingId(key);
+    try {
+      await fetch(`${API_URL}/sessions/${type}/${id}`, {
+        method: "DELETE",
+        headers: authHeaders(),
+      });
+      if (type === "guitar") setGuitarSessions((p) => p.filter((s) => s.id !== id));
+      if (type === "visualizer") setVisualizerSessions((p) => p.filter((s) => s.id !== id));
+      if (type === "producer") setProducerSessions((p) => p.filter((s) => s.id !== id));
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const openVisualizerSession = async (id: number) => {
@@ -159,6 +232,7 @@ export default function LibraryPage() {
     }
   };
 
+  // user is guaranteed by RequireAuth wrapper — needed for TS narrowing
   if (!user) return null;
 
   const plan = PLAN_INFO[me?.plan ?? "free"];
@@ -167,6 +241,7 @@ export default function LibraryPage() {
     { id: "overview", label: "Overview" },
     { id: "guitar", label: "Guitar" },
     { id: "visualizer", label: "Visualizer" },
+    { id: "producer", label: "Producer" },
   ];
 
   return (
@@ -188,7 +263,7 @@ export default function LibraryPage() {
         </div>
 
         {/* Tab switcher */}
-        <div className="flex bg-surface-3 rounded-2xl p-1 mb-8 border border-surface-border max-w-sm">
+        <div className="flex bg-surface-3 rounded-2xl p-1 mb-8 border border-surface-border max-w-md">
           {TABS.map(({ id, label }) => (
             <button
               key={id}
@@ -234,37 +309,50 @@ export default function LibraryPage() {
             </div>
 
             {/* Recent Projects */}
-            <div className="space-y-3">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Recent Projects</p>
-              {loading ? (
-                <div className="flex items-center justify-center py-6">
-                  <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+            {(() => {
+              const recentProjects = [
+                ...guitarSessions.map((s) => ({ type: "guitar" as const, id: s.id, label: s.label, created_at: s.created_at })),
+                ...producerSessions.map((s) => ({ type: "producer" as const, id: s.id, label: s.title, created_at: s.created_at })),
+              ]
+                .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+                .slice(0, 3);
+
+              return (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Recent Projects</p>
+                  {loading ? (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="w-5 h-5 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  ) : recentProjects.length === 0 ? (
+                    <div className="glass rounded-2xl border border-surface-border p-6 text-center">
+                      <p className="text-gray-400 text-sm font-medium mb-1">No projects created yet</p>
+                      <Link
+                        href="/analyze"
+                        className="inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 font-semibold transition-colors mt-1"
+                      >
+                        <PlusCircle size={13} />
+                        Create your first project
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {recentProjects.map((p) => (
+                        <SessionCard
+                          key={`${p.type}-${p.id}`}
+                          label={p.label}
+                          subtitle={formatDate(p.created_at)}
+                          icon={p.type === "producer" ? Wand2 : Guitar}
+                          onClick={() => p.type === "producer" ? openProducerSession(p.id) : openGuitarSession(p.id)}
+                          onDelete={() => deleteSession(p.type, p.id)}
+                          deleting={deletingId === `${p.type}-${p.id}`}
+                        />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              ) : guitarSessions.length === 0 ? (
-                <div className="glass rounded-2xl border border-surface-border p-6 text-center">
-                  <p className="text-gray-400 text-sm font-medium mb-1">No projects created yet</p>
-                  <Link
-                    href="/analyze"
-                    className="inline-flex items-center gap-1.5 text-xs text-brand-400 hover:text-brand-300 font-semibold transition-colors mt-1"
-                  >
-                    <PlusCircle size={13} />
-                    Create your first project
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {guitarSessions.slice(0, 3).map((s) => (
-                    <SessionCard
-                      key={s.id}
-                      label={s.label}
-                      subtitle={formatDate(s.created_at)}
-                      icon={Guitar}
-                      onClick={() => openGuitarSession(s.id)}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* CTAs */}
             <div className="space-y-3">
@@ -281,6 +369,12 @@ export default function LibraryPage() {
                 icon={Music2}
                 label="Piano Visualizer"
                 desc="MIDI & songs with a lit keyboard"
+              />
+              <CtaCard
+                href="/producer"
+                icon={Wand2}
+                label="Producer"
+                desc="Full mixes — harmony, melody & MIDI export"
               />
             </div>
 
@@ -331,6 +425,8 @@ export default function LibraryPage() {
                     subtitle={formatDate(s.created_at)}
                     icon={Guitar}
                     onClick={() => openGuitarSession(s.id)}
+                    onDelete={() => deleteSession("guitar", s.id)}
+                    deleting={deletingId === `guitar-${s.id}`}
                   />
                 ))}
               </div>
@@ -377,7 +473,58 @@ export default function LibraryPage() {
                     subtitle={`${s.source === "midi" ? "MIDI • " : ""}${formatDate(s.created_at)}`}
                     icon={s.source === "midi" ? Upload : BookOpen}
                     onClick={() => openVisualizerSession(s.id)}
+                    onDelete={() => deleteSession("visualizer", s.id)}
                     loading={openingId === s.id}
+                    deleting={deletingId === `visualizer-${s.id}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Producer tab ─────────────────────────────────────────────── */}
+        {tab === "producer" && (
+          <div>
+            <div className="mb-5">
+              <Link
+                href="/producer"
+                className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
+              >
+                <Wand2 size={15} />
+                New analysis
+              </Link>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : producerSessions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <Wand2 size={40} className="text-gray-600 mb-4" />
+                <p className="text-gray-400 font-medium mb-1">No sessions yet</p>
+                <p className="text-gray-600 text-sm mb-5">Analyse audio with Producer to save it here.</p>
+                <Link
+                  href="/producer"
+                  className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
+                >
+                  <Wand2 size={15} />
+                  Go to Producer
+                </Link>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {producerSessions.map((s) => (
+                  <SessionCard
+                    key={s.id}
+                    label={s.title}
+                    subtitle={formatDate(s.created_at)}
+                    icon={Wand2}
+                    onClick={() => openProducerSession(s.id)}
+                    onDelete={() => deleteSession("producer", s.id)}
+                    loading={openingId === s.id}
+                    deleting={deletingId === `producer-${s.id}`}
                   />
                 ))}
               </div>
@@ -386,5 +533,13 @@ export default function LibraryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function LibraryPage() {
+  return (
+    <RequireAuth>
+      <LibraryContent />
+    </RequireAuth>
   );
 }
