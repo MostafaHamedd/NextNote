@@ -21,7 +21,7 @@ export interface ChordData {
 interface PianoViewProps {
   chordData: ChordData[];
   bpm: number;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 // ─── Piano key layout (C3–C5, white key width = 40 px) ───────────────────────
@@ -343,9 +343,11 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
             {isAuto ? <><Square size={13} /> Stop</> : <><RotateCcw size={13} /> Auto Play</>}
           </button>
 
-          <button onClick={() => { stopAuto(); onClose(); }} className="p-1.5 rounded-lg hover:bg-surface-3 text-gray-500 hover:text-gray-300 transition-colors">
-            <X size={16} />
-          </button>
+          {onClose && (
+            <button onClick={() => { stopAuto(); onClose(); }} className="p-1.5 rounded-lg hover:bg-surface-3 text-gray-500 hover:text-gray-300 transition-colors">
+              <X size={16} />
+            </button>
+          )}
         </div>
         {!samplerReady && (
           <p className="w-full text-center text-[11px] text-gray-500 sm:text-left sm:w-auto">Loading piano sound…</p>

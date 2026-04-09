@@ -14,6 +14,7 @@ import {
   LogOut,
   Check,
   AlertTriangle,
+  ArrowRight,
   ChevronRight,
   Eye,
   EyeOff,
@@ -22,7 +23,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuth } from "@/context/AuthContext";
-import { getToken, authHeaders } from "@/lib/auth";
+import { getToken, authHeaders, AUTOPLAY_KEY } from "@/lib/auth";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -138,14 +139,48 @@ function AccountContent() {
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
   const [showPw, setShowPw] = useState(false);
   const [pwLoading, setPwLoading] = useState(false);
+  const [portalLoading, setPortalLoading] = useState(false);
 
   const [notifs, setNotifs] = useState({ product: true, billing: true, tips: false });
-  const [autoPlay, setAutoPlay] = useState(false);
+  const [autoPlay, setAutoPlay] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(AUTOPLAY_KEY) === "true";
+  });
+  const [exportLoading, setExportLoading] = useState(false);
 
 
   const showToast = (message: string, type: "success" | "error") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3500);
+  };
+
+  const toggleAutoPlay = () => {
+    setAutoPlay((v) => {
+      const next = !v;
+      localStorage.setItem(AUTOPLAY_KEY, String(next));
+      return next;
+    });
+  };
+
+  const handleExport = async () => {
+    setExportLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/auth/export`, { headers: authHeaders() });
+      if (!res.ok) throw new Error("Export failed.");
+      const data = await res.json();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `nextnote-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast("Export downloaded.", "success");
+    } catch {
+      showToast("Export failed. Please try again.", "error");
+    } finally {
+      setExportLoading(false);
+    }
   };
 
   const handlePasswordChange = async (e: React.FormEvent) => {
@@ -178,6 +213,26 @@ function AccountContent() {
     }
   };
 
+  const handleManageSubscription = async () => {
+    try {
+      setPortalLoading(true);
+      const res = await fetch(`${API_URL}/billing/create-portal-session`, {
+        method: "POST",
+        headers: authHeaders(),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || "Could not open billing portal.");
+      }
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (e: any) {
+      showToast(e.message || "Could not open billing portal.", "error");
+    } finally {
+      setPortalLoading(false);
+    }
+  };
+
   const handleDeleteAccount = () => {
     const confirmed = window.confirm(
       "Are you sure? This will permanently delete your account and all data. This cannot be undone."
@@ -201,12 +256,34 @@ function AccountContent() {
             <button className="text-xs text-brand-400 hover:text-brand-300 font-medium">Edit</button>
           }
         />
-        <Row label="Member since" value="April 2026" />
+        <Row
+          label="Member since"
+          value={
+            user.created_at
+              ? new Date(user.created_at).toLocaleDateString("en-US", { year: "numeric", month: "long" })
+              : "—"
+          }
+        />
       </div>
     ),
 
     subscription: (
       <div className="glass rounded-2xl overflow-hidden divide-y divide-surface-border">
+        {user.subscription_status === "past_due" && (
+          <div className="flex items-center gap-2.5 px-5 py-3 bg-amber-900/30 border-b border-amber-700/40">
+            <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+            <p className="text-xs text-amber-300 font-medium">
+              Your payment is past due. Please update your payment method to keep your subscription active.
+            </p>
+            <button
+              onClick={handleManageSubscription}
+              disabled={portalLoading}
+              className="ml-auto text-xs font-semibold text-amber-300 hover:text-white shrink-0 disabled:opacity-50"
+            >
+              Fix now
+            </button>
+          </div>
+        )}
         <div className="px-5 py-4">
           <div className={`flex items-start justify-between p-4 rounded-xl border ${plan.bg} ${plan.border}`}>
             <div>
@@ -216,26 +293,46 @@ function AccountContent() {
               </div>
               <p className="text-xs text-gray-400">{plan.description}</p>
             </div>
-            {user.plan !== "studio" && (
+            {user.plan === "free" ? (
               <Link
                 href="/pricing"
                 className="flex items-center gap-1 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition-colors shrink-0"
               >
                 Upgrade <ChevronRight size={12} />
               </Link>
+            ) : (
+              <button
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+                className="flex items-center gap-1 text-xs font-semibold text-white bg-surface-3 hover:bg-surface-border disabled:opacity-50 px-3 py-1.5 rounded-lg transition-colors shrink-0"
+              >
+                {portalLoading ? "Opening…" : "Manage"} <ChevronRight size={12} />
+              </button>
             )}
           </div>
         </div>
         <Row
           label="Renewal date"
-          value={user.plan === "free" ? "No renewal — free plan" : "May 7, 2026"}
+          value={
+            user.plan === "free"
+              ? "No renewal — free plan"
+              : user.current_period_end
+              ? new Date(user.current_period_end).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" })
+              : "—"
+          }
         />
         <Row
-          label="Cancel subscription"
-          value={user.plan === "free" ? "Not applicable" : "You can cancel anytime with no penalty"}
+          label="Cancel or change plan"
+          value={user.plan === "free" ? "Not applicable" : "Update payment, cancel, or switch plans via the billing portal"}
           action={
             user.plan !== "free" ? (
-              <button className="text-xs text-red-400 hover:text-red-300 font-medium">Cancel</button>
+              <button
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+                className="text-xs text-brand-400 hover:text-brand-300 font-medium disabled:opacity-50"
+              >
+                Open portal
+              </button>
             ) : undefined
           }
         />
@@ -244,33 +341,35 @@ function AccountContent() {
 
     billing: (
       <div className="glass rounded-2xl overflow-hidden divide-y divide-surface-border">
-        <Row
-          label="Payment method"
-          value={user.plan === "free" ? "None — free plan" : "•••• •••• •••• 4242 (Visa)"}
-          action={
-            user.plan !== "free" ? (
-              <button className="text-xs text-brand-400 hover:text-brand-300 font-medium">Update</button>
-            ) : undefined
-          }
-        />
-        <Row
-          label="Billing email"
-          value={user.email}
-          action={
-            <button className="text-xs text-brand-400 hover:text-brand-300 font-medium">Change</button>
-          }
-        />
-        <Row
-          label="Invoices"
-          value={user.plan === "free" ? "No invoices" : "View past invoices"}
-          action={
-            user.plan !== "free" ? (
-              <button className="text-xs text-brand-400 hover:text-brand-300 font-medium flex items-center gap-1">
-                View <ChevronRight size={12} />
+        {user.plan === "free" ? (
+          <div className="px-5 py-6 text-center">
+            <p className="text-sm text-gray-400 mb-3">No billing on the free plan.</p>
+            <Link
+              href="/pricing"
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
+            >
+              Upgrade to Pro <ArrowRight size={12} />
+            </Link>
+          </div>
+        ) : (
+          <>
+            <div className="px-5 py-4">
+              <p className="text-sm font-medium text-white mb-1">Payment & invoices</p>
+              <p className="text-xs text-gray-500 mb-3">
+                Update your payment method, download invoices, and manage your billing details through the Stripe portal.
+              </p>
+              <button
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+                className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 disabled:opacity-50 px-4 py-2 rounded-xl transition-colors"
+              >
+                {portalLoading ? "Opening…" : "Open Billing Portal"}
+                <ChevronRight size={14} />
               </button>
-            ) : undefined
-          }
-        />
+            </div>
+            <Row label="Billing email" value={user.email} />
+          </>
+        )}
       </div>
     ),
 
@@ -357,7 +456,7 @@ function AccountContent() {
             <p className="text-sm font-medium text-white">Auto-play visualizer</p>
             <p className="text-xs text-gray-500 mt-0.5">Start playback automatically when a song loads</p>
           </div>
-          <ToggleSwitch checked={autoPlay} onChange={() => setAutoPlay((v) => !v)} />
+          <ToggleSwitch checked={autoPlay} onChange={toggleAutoPlay} />
         </div>
         <Row
           label="Language"
@@ -372,7 +471,13 @@ function AccountContent() {
           label="Data export"
           value="Download all your session history and data"
           action={
-            <button className="text-xs text-brand-400 hover:text-brand-300 font-medium">Export</button>
+            <button
+              onClick={handleExport}
+              disabled={exportLoading}
+              className="text-xs text-brand-400 hover:text-brand-300 font-medium disabled:opacity-50"
+            >
+              {exportLoading ? "Exporting…" : "Export"}
+            </button>
           }
         />
       </div>

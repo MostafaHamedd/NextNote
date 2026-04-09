@@ -1,7 +1,10 @@
 "use client";
 
-import { Download, FileJson, Mic, Music2, AlertTriangle, Info, Piano } from "lucide-react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { Download, FileJson, Mic, Music2, AlertTriangle, Info, Piano, Loader2, ChevronDown } from "lucide-react";
 import clsx from "clsx";
+import PianoView, { ChordData } from "@/components/PianoView";
+import ScaleView from "@/components/ScaleView";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,6 +49,8 @@ interface Props {
   data: ProducerData;
   filename: string;
 }
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ── Download helpers ──────────────────────────────────────────────────────────
 
@@ -133,6 +138,119 @@ export default function ProducerResult({ data, filename }: Props) {
   const hintStyle = HINT_STYLES[stem_hint.label] ?? HINT_STYLES.mixed;
   const PREVIEW_LIMIT = 32;
 
+  // ── Piano + Scale state (auto-fetched) ──
+  const [activeTab, setActiveTab] = useState<"piano" | "scales">("piano");
+  const [pianoData, setPianoData] = useState<ChordData[] | null>(null);
+  const [pianoLoading, setPianoLoading] = useState(false);
+  const [pianoError, setPianoError] = useState<string | null>(null);
+
+  const [scaleData, setScaleData] = useState<any | null>(null);
+  const [scaleLoading, setScaleLoading] = useState(false);
+  const [scaleError, setScaleError] = useState<string | null>(null);
+
+  // ── Export dropdown ──
+  const [chordMidiDownloading, setChordMidiDownloading] = useState<"standard" | "full" | "scale" | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  // Auto-fetch piano + scale on mount
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setPianoLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/piano-chords`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chords: a.chords, key: a.key, mode: a.mode }),
+        });
+        if (!res.ok) throw new Error();
+        const json = await res.json();
+        if (!cancelled) setPianoData(json.chord_data);
+      } catch {
+        if (!cancelled) setPianoError("Could not load piano view.");
+      } finally {
+        if (!cancelled) setPianoLoading(false);
+      }
+    })();
+    (async () => {
+      setScaleLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/scale-suggestions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: a.key, mode: a.mode, chords: a.chords }),
+        });
+        if (!res.ok) throw new Error();
+        const json = await res.json();
+        if (!cancelled) setScaleData(json);
+      } catch {
+        if (!cancelled) setScaleError("Could not load scale suggestions.");
+      } finally {
+        if (!cancelled) setScaleLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [a]);
+
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!exportRef.current?.contains(e.target as Node)) setExportOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [exportOpen]);
+
+  const handleDownloadChordMidi = useCallback(async (doubleOctave: boolean) => {
+    const key = doubleOctave ? "full" : "standard";
+    setChordMidiDownloading(key);
+    try {
+      const res = await fetch(`${API_URL}/piano-midi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chord_sequence: a.chord_sequence ?? a.chords,
+          bpm: a.bpm,
+          double_octave: doubleOctave,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      const { midi_b64: chordB64 } = await res.json();
+      const binary = atob(chordB64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const suffix = doubleOctave ? "_chords_full" : "_chords";
+      triggerDownload(new Blob([bytes], { type: "audio/midi" }), `${baseName}${suffix}.mid`);
+    } catch {
+      // silently ignore
+    } finally {
+      setChordMidiDownloading(null);
+    }
+  }, [a, baseName]);
+
+  const handleDownloadScaleMidi = useCallback(async () => {
+    setChordMidiDownloading("scale");
+    try {
+      const res = await fetch(`${API_URL}/scale-midi`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: a.key, mode: a.mode, bpm: a.bpm }),
+      });
+      if (!res.ok) throw new Error();
+      const { midi_b64: scaleb64 } = await res.json();
+      const binary = atob(scaleb64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      triggerDownload(new Blob([bytes], { type: "audio/midi" }), `${baseName}_scale_${a.key}_${a.mode}.mid`);
+    } catch {
+      // silently ignore
+    } finally {
+      setChordMidiDownloading(null);
+    }
+  }, [a, baseName]);
+
   return (
     <div className="space-y-4">
 
@@ -155,6 +273,101 @@ export default function ProducerResult({ data, filename }: Props) {
         <StatCard label="Length"   value={fmt(a.duration_seconds)} />
         <StatCard label="Notes"    value={`${note_count}`} sub={`grid: ${grid_used}`} />
       </div>
+
+      {/* ── Tab nav + Export ─────────────────────────────────────────────────── */}
+      <div className="bg-surface-2 border border-surface-border rounded-2xl px-4 py-2 flex items-center gap-1">
+        <button
+          onClick={() => setActiveTab("piano")}
+          className={clsx(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
+            activeTab === "piano"
+              ? "bg-brand-600/20 text-brand-300 border border-brand-500/40"
+              : "text-gray-400 hover:text-gray-200 border border-transparent"
+          )}
+        >
+          Piano
+          {pianoLoading && <Loader2 size={13} className="animate-spin" />}
+        </button>
+        <button
+          onClick={() => setActiveTab("scales")}
+          className={clsx(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
+            activeTab === "scales"
+              ? "bg-amber-600/15 text-amber-300 border border-amber-500/35"
+              : "text-gray-400 hover:text-gray-200 border border-transparent"
+          )}
+        >
+          Scales
+          {scaleLoading && <Loader2 size={13} className="animate-spin" />}
+        </button>
+
+        <div ref={exportRef} className="relative ml-auto">
+          <button
+            onClick={() => setExportOpen((v) => !v)}
+            disabled={chordMidiDownloading !== null}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-60"
+          >
+            {chordMidiDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {chordMidiDownloading ? "Generating…" : "Export"}
+            {!chordMidiDownloading && <ChevronDown size={13} className={clsx("transition-transform", exportOpen && "rotate-180")} />}
+          </button>
+
+          {exportOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-56 bg-surface-2 border border-surface-border rounded-xl shadow-xl z-20 overflow-hidden">
+              <button
+                onClick={() => { setExportOpen(false); handleDownloadChordMidi(false); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
+              >
+                <Download size={13} className="text-brand-400 shrink-0" />
+                Chord MIDI — Standard
+              </button>
+              <div className="mx-3 border-t border-surface-border" />
+              <button
+                onClick={() => { setExportOpen(false); handleDownloadChordMidi(true); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
+              >
+                <Download size={13} className="text-brand-400 shrink-0" />
+                Chord MIDI — Full Octave
+              </button>
+              <div className="mx-3 border-t border-surface-border" />
+              <button
+                onClick={() => { setExportOpen(false); handleDownloadScaleMidi(); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
+              >
+                <Download size={13} className="text-amber-400 shrink-0" />
+                <span>
+                  Scale Reference
+                  <span className="block text-[10px] text-gray-500">{a.key} {a.mode} — 8 notes</span>
+                </span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Active panel ─────────────────────────────────────────────────────── */}
+      {activeTab === "piano" && (
+        <>
+          {pianoLoading && (
+            <div className="bg-surface-2 border border-surface-border rounded-2xl p-6 flex items-center gap-3 text-gray-500 text-sm">
+              <Loader2 size={15} className="animate-spin shrink-0" />Loading piano view…
+            </div>
+          )}
+          {pianoError && <p className="text-xs text-red-400 px-1">{pianoError}</p>}
+          {pianoData && <PianoView chordData={pianoData} bpm={a.bpm} />}
+        </>
+      )}
+      {activeTab === "scales" && (
+        <>
+          {scaleLoading && (
+            <div className="bg-surface-2 border border-surface-border rounded-2xl p-6 flex items-center gap-3 text-gray-500 text-sm">
+              <Loader2 size={15} className="animate-spin shrink-0" />Loading scale suggestions…
+            </div>
+          )}
+          {scaleError && <p className="text-xs text-red-400 px-1">{scaleError}</p>}
+          {scaleData && <ScaleView data={scaleData} />}
+        </>
+      )}
 
       {/* ── Harmony + Track Hint (2-col on large) ────────────────────────── */}
       <div className="grid gap-4 lg:grid-cols-2">

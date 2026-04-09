@@ -119,7 +119,7 @@ export default function AnalyzePage() {
           </p>
 
           {/* Free attempt indicator (anonymous only) */}
-          {remaining > 0 && remaining <= 3 && (
+          {remaining !== null && remaining > 0 && (
             <div className="inline-flex items-center gap-2 mt-4 bg-surface-3/60 border border-surface-border rounded-full px-4 py-1.5">
               <Lock size={12} className="text-gray-500" />
               <span className="text-xs text-gray-400">

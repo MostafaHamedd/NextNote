@@ -1,5 +1,6 @@
 const TOKEN_KEY = "nn_auth_token";
 const ATTEMPTS_KEY = "nn_free_attempts";
+export const AUTOPLAY_KEY = "nn_autoplay_visualizer";
 export const ANON_SESSIONS_KEY = "music-assistant-sessions";
 export const MAX_FREE_ATTEMPTS = 3;
 
@@ -7,6 +8,9 @@ export interface AuthUser {
   id: number;
   email: string;
   plan: "free" | "pro" | "studio";
+  subscription_status?: string | null;  // active | past_due | canceled | null
+  current_period_end?: string | null;   // ISO string, only present for paid plans
+  created_at?: string | null;           // ISO string, from /auth/me
 }
 
 // ── Token storage ─────────────────────────────────────────────────────────────

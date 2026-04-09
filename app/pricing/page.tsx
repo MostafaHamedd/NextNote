@@ -1,9 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Zap, Crown, Star, ArrowRight, Music, Mic, FileMusic, Layers } from "lucide-react";
+import { Check, Zap, Crown, Star, ArrowRight, Music, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { authHeaders } from "@/lib/auth";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 const PLANS = [
   {
@@ -85,13 +89,39 @@ const PLANS = [
 export default function PricingPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleCta = (planId: string) => {
+  const handleCta = async (planId: string) => {
+    setError(null);
+
     if (planId === "free") {
       router.push(user ? "/analyze" : "/login");
-    } else {
-      // Payment flow placeholder — for now route to login if not authenticated
-      router.push(user ? "/analyze" : "/login");
+      return;
+    }
+
+    if (!user) {
+      router.push(`/login?next=/pricing`);
+      return;
+    }
+
+    try {
+      setLoadingPlan(planId);
+      const res = await fetch(`${API_URL}/billing/create-checkout-session`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ plan: planId }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.detail || "Failed to start checkout.");
+      }
+      const { url } = await res.json();
+      window.location.href = url;
+    } catch (e: any) {
+      setError(e.message || "Something went wrong. Please try again.");
+    } finally {
+      setLoadingPlan(null);
     }
   };
 
@@ -126,11 +156,18 @@ export default function PricingPage() {
           </p>
         </div>
 
+        {error && (
+          <div className="max-w-md mx-auto mb-8 bg-red-900/20 border border-red-800/50 rounded-xl px-4 py-3 text-sm text-red-300 text-center">
+            {error}
+          </div>
+        )}
+
         {/* Plan cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {PLANS.map((plan) => {
             const Icon = plan.icon;
             const isCurrent = user?.plan === plan.id;
+            const isLoading = loadingPlan === plan.id;
 
             return (
               <div
@@ -148,9 +185,7 @@ export default function PricingPage() {
                   <div
                     className={[
                       "absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-xs font-bold text-white",
-                      plan.id === "pro"
-                        ? "bg-brand-600"
-                        : "bg-amber-600",
+                      plan.id === "pro" ? "bg-brand-600" : "bg-amber-600",
                     ].join(" ")}
                   >
                     {plan.badge}
@@ -191,14 +226,29 @@ export default function PricingPage() {
                 {/* CTA */}
                 <button
                   onClick={() => handleCta(plan.id)}
-                  disabled={isCurrent}
+                  disabled={isCurrent || isLoading || loadingPlan !== null}
                   className={[
                     "w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-semibold text-sm transition-all mb-7",
-                    isCurrent ? "opacity-50 cursor-not-allowed bg-surface-3 text-gray-400" : plan.ctaStyle,
+                    isCurrent
+                      ? "opacity-50 cursor-not-allowed bg-surface-3 text-gray-400"
+                      : isLoading
+                      ? "opacity-75 cursor-wait " + plan.ctaStyle
+                      : plan.ctaStyle,
                   ].join(" ")}
                 >
-                  {isCurrent ? "Current Plan" : plan.cta}
-                  {!isCurrent && <ArrowRight size={15} />}
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin" />
+                      Redirecting…
+                    </>
+                  ) : isCurrent ? (
+                    "Current Plan"
+                  ) : (
+                    <>
+                      {plan.cta}
+                      <ArrowRight size={15} />
+                    </>
+                  )}
                 </button>
 
                 {/* Features */}

@@ -3,10 +3,11 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import {
   Music, Zap, Lightbulb, Star, ArrowRight,
-  Sparkles, Tag, Piano, Loader2, Download,
+  Sparkles, Tag, Loader2, Download, ChevronDown,
 } from "lucide-react";
 import clsx from "clsx";
 import PianoView, { ChordData } from "@/components/PianoView";
+import ScaleView from "@/components/ScaleView";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,7 +42,6 @@ interface Props {
 }
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-
 const FEEDBACK_PENDING = "In progress";
 
 function feedbackBodyClass(text: string) {
@@ -49,8 +49,6 @@ function feedbackBodyClass(text: string) {
     ? "text-sm text-gray-500 italic"
     : "text-gray-300 text-sm leading-relaxed";
 }
-
-// ─── Mood colour helper ───────────────────────────────────────────────────────
 
 const MOOD_COLORS: Record<string, string> = {
   default: "bg-brand-500/15 text-brand-300 border-brand-500/30",
@@ -112,59 +110,74 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
   const [pianoData, setPianoData] = useState<ChordData[] | null>(null);
   const [pianoLoading, setPianoLoading] = useState(false);
   const [pianoError, setPianoError] = useState<string | null>(null);
-  const [showPiano, setShowPiano] = useState(false);
-  const [midiDownloading, setMidiDownloading] = useState(false);
-  const pianoSectionRef = useRef<HTMLDivElement>(null);
 
+  const [scaleData, setScaleData] = useState<any | null>(null);
+  const [scaleLoading, setScaleLoading] = useState(false);
+  const [scaleError, setScaleError] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"piano" | "scales">("piano");
+  const [midiDownloading, setMidiDownloading] = useState<"standard" | "full" | null>(null);
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  // Auto-fetch piano + scale on mount
   useEffect(() => {
-    if (!showPiano || !pianoData) return;
-    if (typeof window === "undefined") return;
-    if (!window.matchMedia("(max-width: 1023px)").matches) return;
+    let cancelled = false;
+    (async () => {
+      setPianoLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/piano-chords`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ chords: analysis.chords, key: analysis.key, mode: analysis.mode }),
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (!cancelled) setPianoData(data.chord_data);
+      } catch {
+        if (!cancelled) setPianoError("Could not load piano view.");
+      } finally {
+        if (!cancelled) setPianoLoading(false);
+      }
+    })();
+    (async () => {
+      setScaleLoading(true);
+      try {
+        const res = await fetch(`${API_URL}/scale-suggestions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: analysis.key, mode: analysis.mode, chords: analysis.chords }),
+        });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (!cancelled) setScaleData(data);
+      } catch {
+        if (!cancelled) setScaleError("Could not load scale suggestions.");
+      } finally {
+        if (!cancelled) setScaleLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [analysis]);
 
-    const el = pianoSectionRef.current;
-    if (!el) return;
-
-    const id = window.setTimeout(() => {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 80);
-    return () => window.clearTimeout(id);
-  }, [showPiano, pianoData]);
+  // Close export dropdown on outside click
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (!exportRef.current?.contains(e.target as Node)) setExportOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [exportOpen]);
 
   const fmt = (s: number) =>
     s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 
   const [styleMain, styleSub] = analysis.playing_style.split("/");
 
-  const handleViewOnPiano = useCallback(async () => {
-    if (pianoData) {
-      setShowPiano((v) => !v);
-      return;
-    }
-    setPianoLoading(true);
-    setPianoError(null);
-    try {
-      const res = await fetch(`${API_URL}/piano-chords`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chords: analysis.chords,
-          key: analysis.key,
-          mode: analysis.mode,
-        }),
-      });
-      if (!res.ok) throw new Error("Failed to load piano data");
-      const data = await res.json();
-      setPianoData(data.chord_data);
-      setShowPiano(true);
-    } catch (e: any) {
-      setPianoError("Could not load piano view — is the backend running?");
-    } finally {
-      setPianoLoading(false);
-    }
-  }, [pianoData, analysis]);
-
-  const handleDownloadMidi = useCallback(async () => {
-    setMidiDownloading(true);
+  const handleDownloadMidi = useCallback(async (doubleOctave: boolean) => {
+    const key = doubleOctave ? "full" : "standard";
+    setMidiDownloading(key);
     try {
       const res = await fetch(`${API_URL}/piano-midi`, {
         method: "POST",
@@ -172,6 +185,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         body: JSON.stringify({
           chord_sequence: analysis.chord_sequence ?? analysis.chords,
           bpm: analysis.bpm,
+          double_octave: doubleOctave,
         }),
       });
       if (!res.ok) throw new Error();
@@ -179,18 +193,19 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
       const binary = atob(midi_b64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const suffix = doubleOctave ? "_full" : "";
       const url = URL.createObjectURL(new Blob([bytes], { type: "audio/midi" }));
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${analysis.key}_${analysis.mode}_${analysis.bpm}bpm_piano.mid`;
+      a.download = `${analysis.key}_${analysis.mode}_${analysis.bpm}bpm_piano${suffix}.mid`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      // silently ignore — user can retry
+      // silently ignore
     } finally {
-      setMidiDownloading(false);
+      setMidiDownloading(null);
     }
   }, [analysis]);
 
@@ -205,11 +220,96 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         <StatCard label="Style"    value={styleMain}      sub={styleSub} />
       </div>
 
-      {/* ── Row 2: Sonic | Chords | Stage on lg; on mobile piano sits right under Chords ── */}
-      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[1fr_2fr_1fr] lg:gap-4 lg:items-start">
+      {/* ── Row 2: Tab nav + Export ── */}
+      <div className="bg-surface-2 border border-surface-border rounded-2xl px-4 py-2 flex items-center gap-1">
+        <button
+          onClick={() => setActiveTab("piano")}
+          className={clsx(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
+            activeTab === "piano"
+              ? "bg-brand-600/20 text-brand-300 border border-brand-500/40"
+              : "text-gray-400 hover:text-gray-200 border border-transparent"
+          )}
+        >
+          {pianoLoading && activeTab !== "piano" ? <Loader2 size={13} className="animate-spin" /> : null}
+          Piano
+          {pianoLoading && <Loader2 size={13} className="animate-spin ml-1" />}
+        </button>
+        <button
+          onClick={() => setActiveTab("scales")}
+          className={clsx(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
+            activeTab === "scales"
+              ? "bg-amber-600/15 text-amber-300 border border-amber-500/35"
+              : "text-gray-400 hover:text-gray-200 border border-transparent"
+          )}
+        >
+          Scales
+          {scaleLoading && <Loader2 size={13} className="animate-spin ml-1" />}
+        </button>
 
-        {/* ── Left column: Sonic Feel ── */}
-        <div className="space-y-4 w-full lg:row-start-1 lg:col-start-1 lg:self-start">
+        <div ref={exportRef} className="relative ml-auto">
+          <button
+            onClick={() => setExportOpen((v) => !v)}
+            disabled={midiDownloading !== null}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-60"
+          >
+            {midiDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            {midiDownloading ? "Generating…" : "Export"}
+            {!midiDownloading && <ChevronDown size={13} className={clsx("transition-transform", exportOpen && "rotate-180")} />}
+          </button>
+
+          {exportOpen && (
+            <div className="absolute right-0 top-full mt-1.5 w-48 bg-surface-2 border border-surface-border rounded-xl shadow-xl z-20 overflow-hidden">
+              <button
+                onClick={() => { setExportOpen(false); handleDownloadMidi(false); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
+              >
+                <Download size={13} className="text-brand-400 shrink-0" />
+                MIDI — Standard
+              </button>
+              <div className="mx-3 border-t border-surface-border" />
+              <button
+                onClick={() => { setExportOpen(false); handleDownloadMidi(true); }}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
+              >
+                <Download size={13} className="text-brand-400 shrink-0" />
+                MIDI — Full Octave
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── Row 3: Active panel ── */}
+      {activeTab === "piano" && (
+        <>
+          {pianoLoading && (
+            <div className="bg-surface-2 border border-surface-border rounded-2xl p-6 flex items-center gap-3 text-gray-500 text-sm">
+              <Loader2 size={15} className="animate-spin shrink-0" />Loading piano view…
+            </div>
+          )}
+          {pianoError && <p className="text-xs text-red-400 px-1">{pianoError}</p>}
+          {pianoData && <PianoView chordData={pianoData} bpm={analysis.bpm} />}
+        </>
+      )}
+      {activeTab === "scales" && (
+        <>
+          {scaleLoading && (
+            <div className="bg-surface-2 border border-surface-border rounded-2xl p-6 flex items-center gap-3 text-gray-500 text-sm">
+              <Loader2 size={15} className="animate-spin shrink-0" />Loading scale suggestions…
+            </div>
+          )}
+          {scaleError && <p className="text-xs text-red-400 px-1">{scaleError}</p>}
+          {scaleData && <ScaleView data={scaleData} />}
+        </>
+      )}
+
+      {/* ── Row 4: Sonic | Chords (enlarged) | Feedback ── */}
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[200px_1fr_220px] lg:gap-4 lg:items-start">
+
+        {/* Left: Sonic Feel */}
+        <div className="space-y-4 w-full lg:self-start">
           <Card icon={Sparkles} title="Sonic Feel" iconBg="bg-purple-600">
             <div className="grid grid-cols-1 gap-2">
               {[
@@ -223,12 +323,9 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
                 </div>
               ))}
             </div>
-
-            {/* Brightness bar */}
             <div className="mt-3">
               <div className="flex justify-between text-[10px] text-gray-500 mb-1">
-                <span>Dark</span>
-                <span>Bright</span>
+                <span>Dark</span><span>Bright</span>
               </div>
               <div className="h-1.5 bg-surface-3 rounded-full overflow-hidden">
                 <div
@@ -240,88 +337,38 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           </Card>
         </div>
 
-        {/* ── Center column: Chord Progression ── */}
-        <div className="space-y-4 w-full min-w-0 lg:row-start-1 lg:col-start-2 lg:self-start">
-          <Card icon={Music} title="Chord Progression" iconBg="bg-brand-600">
-            <div className="mb-3">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Order Played</p>
-              <div className="flex flex-wrap gap-2">
+        {/* Center: Chord Progression — enlarged */}
+        <div className="w-full min-w-0 lg:self-start">
+          <div className="bg-surface-2 rounded-2xl p-6 border border-surface-border">
+            <div className="flex items-center gap-2.5 mb-5">
+              <div className="p-1.5 rounded-lg bg-brand-600">
+                <Music size={16} className="text-white" />
+              </div>
+              <h3 className="font-semibold text-gray-200 text-sm">Chord Progression</h3>
+            </div>
+
+            <div className="mb-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Order Played</p>
+              <div className="flex flex-wrap gap-2.5">
                 {(analysis.chord_sequence ?? analysis.chords).map((chord, i) => (
-                  <span key={i} className="chord-pill">{chord}</span>
+                  <span key={i} className="chord-pill text-sm px-3 py-1.5">{chord}</span>
                 ))}
               </div>
             </div>
-            <div className="border-t border-surface-border pt-3 mb-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Unique Chords</p>
-              <div className="flex flex-wrap gap-2">
+
+            <div className="border-t border-surface-border pt-4">
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Unique Chords</p>
+              <div className="flex flex-wrap gap-2.5">
                 {analysis.chords.map((chord, i) => (
-                  <span key={i} className="chord-pill">{chord}</span>
+                  <span key={i} className="chord-pill text-sm px-3 py-1.5">{chord}</span>
                 ))}
               </div>
             </div>
-
-            {/* View on Piano + Download MIDI buttons */}
-            <div className="flex flex-wrap gap-2">
-              <button
-                onClick={handleViewOnPiano}
-                disabled={pianoLoading}
-                className={clsx(
-                  "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all",
-                  showPiano && pianoData
-                    ? "bg-brand-600/30 text-brand-300 border-brand-500/50"
-                    : "bg-surface-3 text-gray-400 border-surface-border hover:text-brand-300 hover:border-brand-500/40 hover:bg-brand-500/10"
-                )}
-              >
-                {pianoLoading ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Piano size={14} />
-                )}
-                {pianoLoading
-                  ? "Loading piano..."
-                  : showPiano && pianoData
-                  ? "Hide Piano"
-                  : "View on Piano"}
-              </button>
-
-              <button
-                onClick={handleDownloadMidi}
-                disabled={midiDownloading}
-                className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-60"
-              >
-                {midiDownloading ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Download size={14} />
-                )}
-                {midiDownloading ? "Generating…" : "Download Piano MIDI"}
-              </button>
-            </div>
-
-            {pianoError && (
-              <p className="text-xs text-red-400 mt-2">{pianoError}</p>
-            )}
-          </Card>
+          </div>
         </div>
 
-        {/* ── Piano: directly under chord card in reading order; full-width row below on desktop ── */}
-        {showPiano && pianoData && (
-          <div
-            ref={pianoSectionRef}
-            className="w-full min-w-0 scroll-mt-4 lg:row-start-2 lg:col-span-3 lg:col-start-1"
-          >
-            <PianoView
-              chordData={pianoData}
-              bpm={analysis.bpm}
-              onClose={() => setShowPiano(false)}
-            />
-          </div>
-        )}
-
-        {/* ── Right column: Stage / Working / Missing ── */}
-        <div className="space-y-4 w-full lg:row-start-1 lg:col-start-3 lg:self-start">
-
-          {/* Stage badge */}
+        {/* Right: Stage / Working / Missing */}
+        <div className="space-y-4 w-full lg:self-start">
           <div className="flex items-start gap-3 bg-surface-2 rounded-2xl p-5 border border-surface-border">
             <div className="p-1.5 bg-gradient-to-br from-brand-600 to-accent-purple rounded-lg shrink-0">
               <Zap size={16} className="text-white" />
@@ -334,7 +381,6 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
             </div>
           </div>
 
-          {/* What's working */}
           <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
             <div className="flex items-center gap-2 mb-3">
               <Star size={14} className="text-green-400 shrink-0" />
@@ -343,7 +389,6 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
             <p className={feedbackBodyClass(feedback.what_is_working)}>{feedback.what_is_working}</p>
           </div>
 
-          {/* What's missing */}
           <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
             <div className="flex items-center gap-2 mb-3">
               <ArrowRight size={14} className="text-amber-400 shrink-0" />
@@ -354,7 +399,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         </div>
       </div>
 
-      {/* ── Next Step hero (full width) ── */}
+      {/* ── Next Step hero ── */}
       <div className="gradient-border">
         <div className="bg-surface-1 rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-3">
@@ -363,7 +408,6 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
             </div>
             <span className="text-[10px] font-bold uppercase tracking-widest text-brand-400">Next Step</span>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <p className={clsx("mb-3", feedback.next_step === FEEDBACK_PENDING ? "text-xl font-semibold text-gray-500 italic" : "text-xl font-bold text-white")}>
@@ -381,18 +425,14 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         </div>
       </div>
 
-      {/* ── Row 3: Genre / Mood / Why — 3 columns ── */}
+      {/* ── Genre / Mood / Why ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-
-        {/* Genre */}
         <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">Genre Directions</p>
           {feedback.genre_suggestions?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {feedback.genre_suggestions.map((g) => (
-                <span key={g} className="text-xs bg-surface-3 border border-surface-border text-gray-300 rounded-lg px-2.5 py-1">
-                  {g}
-                </span>
+                <span key={g} className="text-xs bg-surface-3 border border-surface-border text-gray-300 rounded-lg px-2.5 py-1">{g}</span>
               ))}
             </div>
           ) : (
@@ -400,7 +440,6 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           )}
         </div>
 
-        {/* Mood */}
         <div className="bg-surface-2 rounded-2xl p-5 border border-surface-border">
           <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
             <Tag size={10} /> Mood Tags
@@ -408,9 +447,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           {feedback.mood_tags?.length ? (
             <div className="flex flex-wrap gap-1.5">
               {feedback.mood_tags.map((m) => (
-                <span key={m} className={clsx("text-xs border rounded-lg px-2.5 py-1", moodColor(m))}>
-                  {m}
-                </span>
+                <span key={m} className={clsx("text-xs border rounded-lg px-2.5 py-1", moodColor(m))}>{m}</span>
               ))}
             </div>
           ) : (
@@ -418,7 +455,6 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           )}
         </div>
 
-        {/* Why it works */}
         <Card icon={Lightbulb} title="Why It Works" iconBg="bg-cyan-600">
           <p className={clsx("text-xs leading-relaxed", feedback.why_it_works === FEEDBACK_PENDING ? "text-gray-500 italic" : "text-gray-400")}>
             {feedback.why_it_works}

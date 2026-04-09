@@ -9,17 +9,24 @@ import {
   getCurrentUser,
   MAX_FREE_ATTEMPTS,
 } from "@/lib/auth";
+import { useAuth } from "@/context/AuthContext";
 
 export function useFreeAttempts() {
   const router = useRouter();
+  const { user } = useAuth();
   const [attempts, setAttempts] = useState(0);
   const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
+    if (user) {
+      setAttempts(0);
+      setBlocked(false);
+      return;
+    }
     const count = getFreeAttempts();
     setAttempts(count);
     setBlocked(isAccessBlocked());
-  }, []);
+  }, [user]);
 
   /**
    * Call BEFORE making a feature API request.
@@ -50,7 +57,7 @@ export function useFreeAttempts() {
     setBlocked(newCount >= MAX_FREE_ATTEMPTS);
   }, []);
 
-  const remaining = Math.max(0, MAX_FREE_ATTEMPTS - attempts);
+  const remaining = user ? null : Math.max(0, MAX_FREE_ATTEMPTS - attempts);
 
   return { attempts, blocked, remaining, checkAccess, recordUsage };
 }

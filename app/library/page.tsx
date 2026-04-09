@@ -293,11 +293,13 @@ function LibraryContent() {
                   </div>
                   {me && (
                     <p className="text-gray-400 text-xs">
-                      {me.monthly_uses} {me.monthly_uses === 1 ? "analysis" : "analyses"} this month
+                      {me.plan === "free"
+                        ? `${me.monthly_uses} ${me.monthly_uses === 1 ? "analysis" : "analyses"} this month`
+                        : "Unlimited analyses"}
                     </p>
                   )}
                 </div>
-                {me?.plan !== "studio" && (
+                {me?.plan === "free" && (
                   <Link
                     href="/pricing"
                     className="text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition-colors"

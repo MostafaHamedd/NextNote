@@ -26,6 +26,8 @@ function ProducerPageInner() {
   // Options
   const [snapToKey, setSnapToKey] = useState(false);
   const [grid, setGrid] = useState<Grid>("1/16");
+  const [padMode, setPadMode] = useState(false);
+  const [bpmOverride, setBpmOverride] = useState(120);
 
   useEffect(() => {
     if (!sessionId) return;
@@ -57,9 +59,15 @@ function ProducerPageInner() {
       const params = new URLSearchParams({
         snap_to_key: snapToKey ? "true" : "false",
         grid,
+        pad_mode: padMode ? "true" : "false",
+        ...(padMode ? { bpm_override: String(bpmOverride) } : {}),
       });
 
-      setProgress("Running pitch detection (this can take 10–30 s on longer clips)…");
+      setProgress(
+        padMode
+          ? "Extracting key & chords…"
+          : "Running pitch detection (this can take 10–30 s on longer clips)…"
+      );
 
       const res = await fetch(`${API_URL}/producer/analyze?${params}`, {
         method: "POST",
@@ -80,7 +88,7 @@ function ProducerPageInner() {
       setIsAnalyzing(false);
       setProgress("");
     }
-  }, [snapToKey, grid]);
+  }, [snapToKey, grid, padMode, bpmOverride]);
 
   return (
     <div className="min-h-screen bg-surface relative overflow-hidden">
@@ -147,7 +155,7 @@ function ProducerPageInner() {
             </div>
 
             {/* Snap to key */}
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-4 mb-4">
               <div>
                 <p className="text-sm text-gray-300 font-medium">Snap notes to key</p>
                 <p className="text-xs text-gray-600 mt-0.5">
@@ -172,6 +180,51 @@ function ProducerPageInner() {
                   )}
                 />
               </button>
+            </div>
+
+            {/* Pad / drone mode */}
+            <div className="border-t border-surface-border pt-4">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm text-gray-300 font-medium">Pad / drone / ambient</p>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    No clear rhythm — skips BPM detection and melody extraction. Focuses on key and chords.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={padMode}
+                  onClick={() => setPadMode((v) => !v)}
+                  className={clsx(
+                    "relative shrink-0 h-6 w-11 rounded-full border-0 p-1 transition-colors mt-0.5",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/50",
+                    padMode ? "bg-amber-600" : "bg-surface-3"
+                  )}
+                >
+                  <span
+                    className={clsx(
+                      "pointer-events-none block h-4 w-4 rounded-full bg-white shadow-md transition-transform duration-200",
+                      padMode ? "translate-x-5" : "translate-x-0"
+                    )}
+                  />
+                </button>
+              </div>
+
+              {padMode && (
+                <div className="mt-3 flex items-center gap-3">
+                  <label className="text-xs text-gray-400 shrink-0">Project BPM</label>
+                  <input
+                    type="number"
+                    min={20}
+                    max={300}
+                    value={bpmOverride}
+                    onChange={(e) => setBpmOverride(Math.max(20, Math.min(300, Number(e.target.value))))}
+                    className="w-20 bg-surface-3 border border-surface-border rounded-lg px-3 py-1.5 text-sm text-white text-center focus:outline-none focus:border-amber-500/60 tabular-nums"
+                  />
+                  <p className="text-xs text-gray-600">Set this to your DAW project tempo.</p>
+                </div>
+              )}
             </div>
           </div>
         )}

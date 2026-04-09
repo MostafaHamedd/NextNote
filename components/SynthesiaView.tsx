@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { SheetData } from "@/lib/sheetStore";
 import { normalisePitch, pitchToMidi, buildKeys } from "@/lib/pianoUtils";
 import { usePianoSampler } from "@/hooks/usePianoSampler";
@@ -8,10 +8,12 @@ import { usePianoPlayback } from "@/hooks/usePianoPlayback";
 import PianoKeyboard from "@/components/piano/PianoKeyboard";
 import PlayerControls from "@/components/piano/PlayerControls";
 import FallingNotesLane from "@/components/piano/FallingNotesLane";
+import { AUTOPLAY_KEY } from "@/lib/auth";
 
 export default function SynthesiaView({ data }: { data: SheetData }) {
   const [showLane, setShowLane] = useState(true);
   const [tutorialDismissed, setTutorialDismissed] = useState(false);
+  const autoPlayFiredRef = useRef(false);
 
   // Auto-dismiss tutorial hint after 4 s
   useEffect(() => {
@@ -34,6 +36,16 @@ export default function SynthesiaView({ data }: { data: SheetData }) {
   // ── Hooks ──────────────────────────────────────────────────────────────────
   const sampler  = usePianoSampler(sortedNotes);
   const playback = usePianoPlayback(sortedNotes, totalSec, data.hasSustainEvents ?? false, sampler);
+
+  // ── Auto-play when sampler is ready (if setting enabled) ───────────────────
+  useEffect(() => {
+    if (!sampler.samplerReady || autoPlayFiredRef.current) return;
+    if (typeof window !== "undefined" && localStorage.getItem(AUTOPLAY_KEY) === "true") {
+      autoPlayFiredRef.current = true;
+      playback.handlePlay();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sampler.samplerReady]);
 
   // ── Keyboard layout ────────────────────────────────────────────────────────
   const midis   = sortedNotes.map(n => pitchToMidi(n.pitch)).filter(m => m >= 0);

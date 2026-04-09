@@ -22,6 +22,7 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (token: string) => void;
   logout: () => void;
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue>({
@@ -30,6 +31,7 @@ const AuthContext = createContext<AuthContextValue>({
   isLoading: true,
   login: () => {},
   logout: () => {},
+  refreshProfile: async () => {},
 });
 
 async function importAnonSessions(
@@ -54,33 +56,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const t = getToken();
-    if (t) {
-      setTokenState(t);
-      setUser(getCurrentUser());
+    if (!t) {
+      setIsLoading(false);
+      return;
     }
-    setIsLoading(false);
+    const decoded = getCurrentUser(); // validates expiry
+    if (!decoded) {
+      removeToken();
+      setIsLoading(false);
+      return;
+    }
+    // Set from JWT immediately so the UI renders without waiting for the network
+    setTokenState(t);
+    setUser(decoded);
+    // Then sync plan with the server (handles webhook-driven plan changes)
+    fetch(`${API_URL}/auth/me`, { headers: { Authorization: `Bearer ${t}` } })
+      .then((res) => {
+        if (res.status === 401) {
+          removeToken();
+          setTokenState(null);
+          setUser(null);
+          return null;
+        }
+        return res.json();
+      })
+      .then((profile) => {
+        if (profile) setUser({ id: profile.id, email: profile.email, plan: profile.plan, subscription_status: profile.subscription_status ?? null, current_period_end: profile.current_period_end ?? null, created_at: profile.created_at ?? null });
+      })
+      .catch(() => {}) // network error — keep JWT-decoded user
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    const t = getToken();
+    if (!t) return;
+    try {
+      const res = await fetch(`${API_URL}/auth/me`, {
+        headers: { Authorization: `Bearer ${t}` },
+      });
+      if (!res.ok) return;
+      const profile = await res.json();
+      setUser({ id: profile.id, email: profile.email, plan: profile.plan, subscription_status: profile.subscription_status ?? null, current_period_end: profile.current_period_end ?? null, created_at: profile.created_at ?? null });
+    } catch {}
   }, []);
 
   const login = useCallback((newToken: string) => {
-    // Capture previous user BEFORE overwriting the token
     const prevUserId = getCurrentUser()?.id ?? null;
 
     setToken(newToken);
     const newUser = getCurrentUser();
 
-    // Clear in-memory result stores on every login (stale across account switches)
     resultStore.clear();
     sheetStore.clear();
 
     if (prevUserId === null && newUser) {
-      // Transitioning from anonymous → migrate any local sessions
       const anonSessions = readAnonSessions();
-      clearAnonSessions(); // clear immediately so we never re-import
+      clearAnonSessions();
       if (anonSessions.length > 0) {
-        importAnonSessions(newToken, anonSessions); // fire-and-forget
+        importAnonSessions(newToken, anonSessions);
       }
     } else {
-      // Account switch or re-login: just clean up the anonymous key
       clearAnonSessions();
     }
 
@@ -91,6 +126,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     removeToken();
+    resetFreeAttempts();
     setTokenState(null);
     setUser(null);
     resultStore.clear();
@@ -98,7 +134,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, token, isLoading, login, logout, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );
