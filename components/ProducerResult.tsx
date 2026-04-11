@@ -5,6 +5,7 @@ import { Download, FileJson, Mic, Music2, AlertTriangle, Info, Piano, Loader2, C
 import clsx from "clsx";
 import PianoView, { ChordData } from "@/components/PianoView";
 import ScaleView from "@/components/ScaleView";
+import { API_URL } from "@/lib/config";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,12 @@ export interface StemHint {
   disclaimer: string;
 }
 
+interface ChordTimelineSegment {
+  chord: string;
+  start_beat: number;
+  duration_beat: number;
+}
+
 export interface ProducerData {
   analysis_summary: {
     key: string;
@@ -33,6 +40,7 @@ export interface ProducerData {
     duration_seconds: number;
     chords: string[];
     chord_sequence: string[];
+    chord_timeline?: ChordTimelineSegment[];
     key_confidence: number;
   };
   melody_notes: MelodyNote[];
@@ -49,8 +57,6 @@ interface Props {
   data: ProducerData;
   filename: string;
 }
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 // ── Download helpers ──────────────────────────────────────────────────────────
 
@@ -149,7 +155,7 @@ export default function ProducerResult({ data, filename }: Props) {
   const [scaleError, setScaleError] = useState<string | null>(null);
 
   // ── Export dropdown ──
-  const [chordMidiDownloading, setChordMidiDownloading] = useState<"standard" | "full" | "scale" | null>(null);
+  const [chordMidiDownloading, setChordMidiDownloading] = useState<"standard" | "full" | "timed" | "scale" | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
@@ -203,25 +209,32 @@ export default function ProducerResult({ data, filename }: Props) {
     return () => document.removeEventListener("mousedown", handler);
   }, [exportOpen]);
 
-  const handleDownloadChordMidi = useCallback(async (doubleOctave: boolean) => {
-    const key = doubleOctave ? "full" : "standard";
+  const handleDownloadChordMidi = useCallback(async (
+    doubleOctave: boolean,
+    timed: boolean = false,
+  ) => {
+    const key = timed ? "timed" : doubleOctave ? "full" : "standard";
     setChordMidiDownloading(key);
     try {
+      const body: Record<string, unknown> = {
+        chord_sequence: a.chord_sequence ?? a.chords,
+        bpm: a.bpm,
+        double_octave: doubleOctave,
+      };
+      if (timed && a.chord_timeline?.length) {
+        body.chord_timeline = a.chord_timeline;
+      }
       const res = await fetch(`${API_URL}/piano-midi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chord_sequence: a.chord_sequence ?? a.chords,
-          bpm: a.bpm,
-          double_octave: doubleOctave,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error();
       const { midi_b64: chordB64 } = await res.json();
       const binary = atob(chordB64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const suffix = doubleOctave ? "_chords_full" : "_chords";
+      const suffix = timed ? "_chords_timed" : doubleOctave ? "_chords_full" : "_chords";
       triggerDownload(new Blob([bytes], { type: "audio/midi" }), `${baseName}${suffix}.mid`);
     } catch {
       // silently ignore
@@ -329,6 +342,23 @@ export default function ProducerResult({ data, filename }: Props) {
                 <Download size={13} className="text-brand-400 shrink-0" />
                 Chord MIDI — Full Octave
               </button>
+              {/* TODO: Match Lengths — timing accuracy needs work before shipping
+              {a.chord_timeline?.length && (
+                <>
+                  <div className="mx-3 border-t border-surface-border" />
+                  <button
+                    onClick={() => { setExportOpen(false); handleDownloadChordMidi(false, true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
+                  >
+                    <Download size={13} className="text-brand-400 shrink-0" />
+                    <span>
+                      Chord MIDI — Match Lengths
+                      <span className="block text-[10px] text-gray-500">Chord durations from audio</span>
+                    </span>
+                  </button>
+                </>
+              )}
+              */}
               <div className="mx-3 border-t border-surface-border" />
               <button
                 onClick={() => { setExportOpen(false); handleDownloadScaleMidi(); }}

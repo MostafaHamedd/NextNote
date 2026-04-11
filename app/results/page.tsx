@@ -7,8 +7,7 @@ import { ArrowLeft, Music2 } from "lucide-react";
 import AnalysisResult from "@/components/AnalysisResult";
 import { resultStore } from "@/lib/resultStore";
 import { authHeaders } from "@/lib/auth";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
 
 function ResultsContent() {
   const router = useRouter();

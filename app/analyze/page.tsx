@@ -11,10 +11,9 @@ import { useSessionHistory } from "@/hooks/useSessionHistory";
 import { resultStore } from "@/lib/resultStore";
 import { useFreeAttempts } from "@/hooks/useFreeAttempts";
 import { authHeaders } from "@/lib/auth";
+import { API_URL } from "@/lib/config";
 
 type Tab = "record" | "upload";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function AnalyzePage() {
   const router = useRouter();

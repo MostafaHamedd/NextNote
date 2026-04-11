@@ -24,8 +24,7 @@ import {
 import clsx from "clsx";
 import { useAuth } from "@/context/AuthContext";
 import { getToken, authHeaders, AUTOPLAY_KEY } from "@/lib/auth";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
 
 const PLAN_INFO = {
   free: {

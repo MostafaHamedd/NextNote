@@ -11,8 +11,7 @@ import LoadingCard from "@/components/ui/LoadingCard";
 import ErrorBanner from "@/components/ui/ErrorBanner";
 import { useFreeAttempts } from "@/hooks/useFreeAttempts";
 import { authHeaders } from "@/lib/auth";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
 
 type Tab = "learn" | "midi";
 

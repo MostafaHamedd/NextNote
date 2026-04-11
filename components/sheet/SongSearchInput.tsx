@@ -4,7 +4,8 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Search, Music, Loader2 } from "lucide-react";
 import clsx from "clsx";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
+
 const DEBOUNCE_MS = 300;
 
 interface SongResult {

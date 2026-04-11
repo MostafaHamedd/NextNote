@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { Check, Zap, Crown, Star, ArrowRight, Music, Loader2 } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { authHeaders } from "@/lib/auth";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
 
 const PLANS = [
   {

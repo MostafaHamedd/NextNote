@@ -21,8 +21,7 @@ import { authHeaders } from "@/lib/auth";
 import { sheetStore } from "@/lib/sheetStore";
 import { resultStore } from "@/lib/resultStore";
 import RequireAuth from "@/components/RequireAuth";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
 
 type Tab = "overview" | "guitar" | "visualizer" | "producer";
 

@@ -8,8 +8,7 @@ import FileUpload from "@/components/FileUpload";
 import ProducerResult, { type ProducerData } from "@/components/ProducerResult";
 import { authHeaders } from "@/lib/auth";
 import RequireAuth from "@/components/RequireAuth";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
 
 type Grid = "1/8" | "1/16";
 

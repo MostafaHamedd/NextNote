@@ -5,8 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { getToken } from "@/lib/auth";
+import { API_URL } from "@/lib/config";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const POLL_INTERVAL_MS = 1500;
 const POLL_MAX_ATTEMPTS = 10; // fallback polling: 15 seconds total
 

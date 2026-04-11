@@ -13,8 +13,7 @@ import {
 } from "@/lib/auth";
 import { resultStore } from "@/lib/resultStore";
 import { sheetStore } from "@/lib/sheetStore";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -94,6 +93,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const res = await fetch(`${API_URL}/auth/me`, {
         headers: { Authorization: `Bearer ${t}` },
       });
+      if (res.status === 401) {
+        removeToken();
+        setTokenState(null);
+        setUser(null);
+        return;
+      }
       if (!res.ok) return;
       const profile = await res.json();
       setUser({ id: profile.id, email: profile.email, plan: profile.plan, subscription_status: profile.subscription_status ?? null, current_period_end: profile.current_period_end ?? null, created_at: profile.created_at ?? null });

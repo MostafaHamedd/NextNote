@@ -5,8 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Zap, Mail, Lock, Eye, EyeOff, AlertTriangle, ArrowRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
-
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { API_URL } from "@/lib/config";
 
 type Tab = "login" | "register";
 

@@ -8,8 +8,15 @@ import {
 import clsx from "clsx";
 import PianoView, { ChordData } from "@/components/PianoView";
 import ScaleView from "@/components/ScaleView";
+import { API_URL } from "@/lib/config";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ChordTimelineSegment {
+  chord: string;
+  start_beat: number;
+  duration_beat: number;
+}
 
 interface Analysis {
   key: string;
@@ -19,6 +26,7 @@ interface Analysis {
   duration_seconds: number;
   chords: string[];
   chord_sequence: string[];
+  chord_timeline?: ChordTimelineSegment[];
   feel: { tone: string; dynamic: string; texture: string; brightness_score: number };
   playing_style: string;
 }
@@ -41,7 +49,6 @@ interface Props {
   feedback: Feedback;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 const FEEDBACK_PENDING = "In progress";
 
 function feedbackBodyClass(text: string) {
@@ -116,7 +123,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
   const [scaleError, setScaleError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<"piano" | "scales">("piano");
-  const [midiDownloading, setMidiDownloading] = useState<"standard" | "full" | null>(null);
+  const [midiDownloading, setMidiDownloading] = useState<"standard" | "full" | "timed" | null>(null);
   const [exportOpen, setExportOpen] = useState(false);
   const exportRef = useRef<HTMLDivElement>(null);
 
@@ -175,25 +182,32 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
 
   const [styleMain, styleSub] = analysis.playing_style.split("/");
 
-  const handleDownloadMidi = useCallback(async (doubleOctave: boolean) => {
-    const key = doubleOctave ? "full" : "standard";
+  const handleDownloadMidi = useCallback(async (
+    doubleOctave: boolean,
+    timed: boolean = false,
+  ) => {
+    const key = timed ? "timed" : doubleOctave ? "full" : "standard";
     setMidiDownloading(key);
     try {
+      const body: Record<string, unknown> = {
+        chord_sequence: analysis.chord_sequence ?? analysis.chords,
+        bpm: analysis.bpm,
+        double_octave: doubleOctave,
+      };
+      if (timed && analysis.chord_timeline?.length) {
+        body.chord_timeline = analysis.chord_timeline;
+      }
       const res = await fetch(`${API_URL}/piano-midi`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chord_sequence: analysis.chord_sequence ?? analysis.chords,
-          bpm: analysis.bpm,
-          double_octave: doubleOctave,
-        }),
+        body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error();
       const { midi_b64 } = await res.json();
       const binary = atob(midi_b64);
       const bytes = new Uint8Array(binary.length);
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const suffix = doubleOctave ? "_full" : "";
+      const suffix = timed ? "_timed" : doubleOctave ? "_full" : "";
       const url = URL.createObjectURL(new Blob([bytes], { type: "audio/midi" }));
       const a = document.createElement("a");
       a.href = url;
@@ -260,7 +274,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           </button>
 
           {exportOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-48 bg-surface-2 border border-surface-border rounded-xl shadow-xl z-20 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1.5 w-56 bg-surface-2 border border-surface-border rounded-xl shadow-xl z-20 overflow-hidden">
               <button
                 onClick={() => { setExportOpen(false); handleDownloadMidi(false); }}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
@@ -276,6 +290,23 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
                 <Download size={13} className="text-brand-400 shrink-0" />
                 MIDI — Full Octave
               </button>
+              {/* TODO: Match Lengths — timing accuracy needs work before shipping
+              {analysis.chord_timeline?.length && (
+                <>
+                  <div className="mx-3 border-t border-surface-border" />
+                  <button
+                    onClick={() => { setExportOpen(false); handleDownloadMidi(false, true); }}
+                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
+                  >
+                    <Download size={13} className="text-amber-400 shrink-0" />
+                    <span>
+                      MIDI — Match Lengths
+                      <span className="block text-[10px] text-gray-500">Chord durations from audio</span>
+                    </span>
+                  </button>
+                </>
+              )}
+              */}
             </div>
           )}
         </div>
