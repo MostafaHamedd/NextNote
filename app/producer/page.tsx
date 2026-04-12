@@ -7,7 +7,7 @@ import clsx from "clsx";
 import FileUpload from "@/components/FileUpload";
 import ProducerResult, { type ProducerData } from "@/components/ProducerResult";
 import { authHeaders } from "@/lib/auth";
-import RequireAuth from "@/components/RequireAuth";
+import { useFreeAttempts } from "@/hooks/useFreeAttempts";
 import { API_URL } from "@/lib/config";
 
 type Grid = "1/8" | "1/16";
@@ -15,6 +15,9 @@ type Grid = "1/8" | "1/16";
 function ProducerPageInner() {
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("session");
+  const isAnon = searchParams.get("anon") === "1";
+
+  const { remaining, checkAccess, recordUsage } = useFreeAttempts();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<ProducerData | null>(null);
@@ -31,7 +34,10 @@ function ProducerPageInner() {
   useEffect(() => {
     if (!sessionId) return;
     setIsAnalyzing(true);
-    fetch(`${API_URL}/sessions/producer/${sessionId}`, { headers: authHeaders() })
+    const endpoint = isAnon
+      ? `${API_URL}/sessions/anonymous/producer/${sessionId}`
+      : `${API_URL}/sessions/producer/${sessionId}`;
+    fetch(endpoint, { headers: authHeaders() })
       .then((r) => {
         if (!r.ok) throw new Error();
         return r.json();
@@ -42,9 +48,10 @@ function ProducerPageInner() {
       })
       .catch(() => setError("Could not load session."))
       .finally(() => setIsAnalyzing(false));
-  }, [sessionId]);
+  }, [sessionId, isAnon]);
 
   const handleFile = useCallback(async (file: File) => {
+    if (!checkAccess("/producer")) return;
     setIsAnalyzing(true);
     setResult(null);
     setError(null);
@@ -81,13 +88,14 @@ function ProducerPageInner() {
 
       const data: ProducerData = await res.json();
       setResult(data);
+      recordUsage();
     } catch (e: any) {
       setError(e.message || "Analysis failed. Is the backend running?");
     } finally {
       setIsAnalyzing(false);
       setProgress("");
     }
-  }, [snapToKey, grid, padMode, bpmOverride]);
+  }, [snapToKey, grid, padMode, bpmOverride, checkAccess, recordUsage]);
 
   return (
     <div className="min-h-screen bg-surface relative overflow-hidden">
@@ -117,6 +125,15 @@ function ProducerPageInner() {
             Drop any audio — vocal, synth, bass, loop, or rough mix. Get key, BPM, chord progression,
             and a downloadable MIDI melody line ready to drag into Logic Pro.
           </p>
+
+          {remaining !== null && remaining > 0 && (
+            <div className="inline-flex items-center gap-2 mt-4 bg-surface-3/60 border border-surface-border rounded-full px-4 py-1.5">
+              <span className="text-xs text-gray-400">
+                {remaining} free {remaining === 1 ? "analysis" : "analyses"} remaining —{" "}
+                <a href="/login" className="text-brand-400 hover:underline">sign in</a> for unlimited
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Upload card */}
@@ -290,9 +307,5 @@ function ProducerPage() {
 }
 
 export default function ProducerPageRoute() {
-  return (
-    <RequireAuth>
-      <ProducerPage />
-    </RequireAuth>
-  );
+  return <ProducerPage />;
 }

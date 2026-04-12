@@ -14,13 +14,13 @@ import {
   PlusCircle,
   Wand2,
   Trash2,
+  Lock,
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuth } from "@/context/AuthContext";
-import { authHeaders } from "@/lib/auth";
+import { authHeaders, getFingerprint } from "@/lib/auth";
 import { sheetStore } from "@/lib/sheetStore";
 import { resultStore } from "@/lib/resultStore";
-import RequireAuth from "@/components/RequireAuth";
 import { API_URL } from "@/lib/config";
 
 type Tab = "overview" | "guitar" | "visualizer" | "producer";
@@ -28,6 +28,12 @@ type Tab = "overview" | "guitar" | "visualizer" | "producer";
 interface MeData {
   plan: "free" | "pro" | "studio";
   monthly_uses: number;
+}
+
+interface AnonStatus {
+  uses_remaining: number;
+  monthly_uses: number;
+  limit: number;
 }
 
 interface GuitarCard {
@@ -145,68 +151,86 @@ function isMeData(x: unknown): x is MeData {
 
 async function parseJsonIfOk(res: Response): Promise<unknown | null> {
   if (!res.ok) return null;
-  try {
-    return await res.json();
-  } catch {
-    return null;
-  }
+  try { return await res.json(); } catch { return null; }
 }
 
-function LibraryContent() {
+export default function LibraryPage() {
   const { user, token } = useAuth();
   const router = useRouter();
 
   const [tab, setTab] = useState<Tab>("overview");
   const [me, setMe] = useState<MeData | null>(null);
+  const [anonStatus, setAnonStatus] = useState<AnonStatus | null>(null);
   const [guitarSessions, setGuitarSessions] = useState<GuitarCard[]>([]);
   const [visualizerSessions, setVisualizerSessions] = useState<VisualizerCard[]>([]);
   const [producerSessions, setProducerSessions] = useState<ProducerCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [openingId, setOpeningId] = useState<number | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null); // "guitar-1" | "visualizer-2" | "producer-3"
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) {
-      setLoading(false);
-      return;
-    }
-
-    const headers: HeadersInit = { Authorization: `Bearer ${token}` };
     setLoading(true);
 
-    Promise.allSettled([
-      fetch(`${API_URL}/auth/me`, { headers }).then(parseJsonIfOk),
-      fetch(`${API_URL}/sessions/guitar`, { headers }).then(parseJsonIfOk),
-      fetch(`${API_URL}/sessions/visualizer`, { headers }).then(parseJsonIfOk),
-      fetch(`${API_URL}/sessions/producer`, { headers }).then(parseJsonIfOk),
-    ])
-      .then((outcomes) => {
-        const meRaw = outcomes[0].status === "fulfilled" ? outcomes[0].value : null;
-        const guitarRaw = outcomes[1].status === "fulfilled" ? outcomes[1].value : null;
-        const visualizerRaw = outcomes[2].status === "fulfilled" ? outcomes[2].value : null;
-        const producerRaw = outcomes[3].status === "fulfilled" ? outcomes[3].value : null;
-
-        setMe(isMeData(meRaw) ? meRaw : null);
-        setGuitarSessions(Array.isArray(guitarRaw) ? guitarRaw : []);
-        setVisualizerSessions(Array.isArray(visualizerRaw) ? visualizerRaw : []);
-        setProducerSessions(Array.isArray(producerRaw) ? producerRaw : []);
-      })
-      .finally(() => setLoading(false));
+    if (token) {
+      // Authenticated: fetch user data + sessions
+      const headers: HeadersInit = { Authorization: `Bearer ${token}` };
+      Promise.allSettled([
+        fetch(`${API_URL}/auth/me`, { headers }).then(parseJsonIfOk),
+        fetch(`${API_URL}/sessions/guitar`, { headers }).then(parseJsonIfOk),
+        fetch(`${API_URL}/sessions/visualizer`, { headers }).then(parseJsonIfOk),
+        fetch(`${API_URL}/sessions/producer`, { headers }).then(parseJsonIfOk),
+      ])
+        .then((outcomes) => {
+          const meRaw = outcomes[0].status === "fulfilled" ? outcomes[0].value : null;
+          const guitarRaw = outcomes[1].status === "fulfilled" ? outcomes[1].value : null;
+          const visualizerRaw = outcomes[2].status === "fulfilled" ? outcomes[2].value : null;
+          const producerRaw = outcomes[3].status === "fulfilled" ? outcomes[3].value : null;
+          setMe(isMeData(meRaw) ? meRaw : null);
+          setGuitarSessions(Array.isArray(guitarRaw) ? guitarRaw : []);
+          setVisualizerSessions(Array.isArray(visualizerRaw) ? visualizerRaw : []);
+          setProducerSessions(Array.isArray(producerRaw) ? producerRaw : []);
+        })
+        .finally(() => setLoading(false));
+    } else {
+      // Anonymous: fetch sessions by fingerprint
+      const headers = authHeaders();
+      Promise.allSettled([
+        fetch(`${API_URL}/auth/anonymous-status`, { headers }).then(parseJsonIfOk),
+        fetch(`${API_URL}/sessions/anonymous/guitar`, { headers }).then(parseJsonIfOk),
+        fetch(`${API_URL}/sessions/anonymous/visualizer`, { headers }).then(parseJsonIfOk),
+        fetch(`${API_URL}/sessions/anonymous/producer`, { headers }).then(parseJsonIfOk),
+      ])
+        .then((outcomes) => {
+          const statusRaw = outcomes[0].status === "fulfilled" ? outcomes[0].value : null;
+          const guitarRaw = outcomes[1].status === "fulfilled" ? outcomes[1].value : null;
+          const visualizerRaw = outcomes[2].status === "fulfilled" ? outcomes[2].value : null;
+          const producerRaw = outcomes[3].status === "fulfilled" ? outcomes[3].value : null;
+          if (statusRaw && typeof statusRaw === "object" && "uses_remaining" in statusRaw) {
+            setAnonStatus(statusRaw as AnonStatus);
+          }
+          setGuitarSessions(Array.isArray(guitarRaw) ? guitarRaw : []);
+          setVisualizerSessions(Array.isArray(visualizerRaw) ? visualizerRaw : []);
+          setProducerSessions(Array.isArray(producerRaw) ? producerRaw : []);
+        })
+        .finally(() => setLoading(false));
+    }
   }, [token]);
 
+  const sessionPrefix = user ? "sessions" : "sessions/anonymous";
+
   const openGuitarSession = (id: number) => {
-    router.push(`/results?session=${id}`);
+    router.push(`/results?session=${id}${!user ? "&anon=1" : ""}`);
   };
 
   const openProducerSession = (id: number) => {
-    router.push(`/producer?session=${id}`);
+    router.push(`/producer?session=${id}${!user ? "&anon=1" : ""}`);
   };
 
   const deleteSession = async (type: "guitar" | "visualizer" | "producer", id: number) => {
     const key = `${type}-${id}`;
     setDeletingId(key);
     try {
-      await fetch(`${API_URL}/sessions/${type}/${id}`, {
+      await fetch(`${API_URL}/${sessionPrefix}/${type}/${id}`, {
         method: "DELETE",
         headers: authHeaders(),
       });
@@ -221,7 +245,7 @@ function LibraryContent() {
   const openVisualizerSession = async (id: number) => {
     setOpeningId(id);
     try {
-      const res = await fetch(`${API_URL}/sessions/visualizer/${id}`, { headers: authHeaders() });
+      const res = await fetch(`${API_URL}/${sessionPrefix}/visualizer/${id}`, { headers: authHeaders() });
       if (!res.ok) throw new Error();
       const data = await res.json();
       sheetStore.set(data.sheet);
@@ -230,11 +254,6 @@ function LibraryContent() {
       setOpeningId(null);
     }
   };
-
-  // user is guaranteed by RequireAuth wrapper — needed for TS narrowing
-  if (!user) return null;
-
-  const plan = PLAN_INFO[me?.plan ?? "free"];
 
   const TABS: { id: Tab; label: string }[] = [
     { id: "overview", label: "Overview" },
@@ -282,32 +301,64 @@ function LibraryContent() {
         {/* ── Overview tab ──────────────────────────────────────────────── */}
         {tab === "overview" && (
           <div className="space-y-6">
-            {/* Plan card */}
-            <div className={clsx("glass rounded-2xl p-5 border", plan.border, plan.bg)}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <Zap size={14} className={plan.color} />
-                    <span className={clsx("font-bold text-sm", plan.color)}>{plan.label} Plan</span>
+            {/* Plan card — authenticated */}
+            {user && (
+              <div className={clsx("glass rounded-2xl p-5 border", PLAN_INFO[me?.plan ?? "free"].border, PLAN_INFO[me?.plan ?? "free"].bg)}>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Zap size={14} className={PLAN_INFO[me?.plan ?? "free"].color} />
+                      <span className={clsx("font-bold text-sm", PLAN_INFO[me?.plan ?? "free"].color)}>
+                        {PLAN_INFO[me?.plan ?? "free"].label} Plan
+                      </span>
+                    </div>
+                    {me && (
+                      <p className="text-gray-400 text-xs">
+                        {me.plan === "free"
+                          ? `${me.monthly_uses} / 3 analyses used this month`
+                          : "Unlimited analyses"}
+                      </p>
+                    )}
                   </div>
-                  {me && (
-                    <p className="text-gray-400 text-xs">
-                      {me.plan === "free"
-                        ? `${me.monthly_uses} ${me.monthly_uses === 1 ? "analysis" : "analyses"} this month`
-                        : "Unlimited analyses"}
-                    </p>
+                  {me?.plan === "free" && (
+                    <Link
+                      href="/pricing"
+                      className="text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition-colors"
+                    >
+                      Upgrade
+                    </Link>
                   )}
                 </div>
-                {me?.plan === "free" && (
+              </div>
+            )}
+
+            {/* Anonymous usage card */}
+            {!user && (
+              <div className="glass rounded-2xl p-5 border border-surface-border">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <Lock size={14} className="text-gray-400" />
+                      <span className="font-bold text-sm text-gray-300">Guest</span>
+                    </div>
+                    {anonStatus ? (
+                      <p className="text-gray-400 text-xs">
+                        {anonStatus.monthly_uses} / {anonStatus.limit} free analyses used
+                        {anonStatus.uses_remaining === 0 ? " — limit reached" : ""}
+                      </p>
+                    ) : (
+                      <p className="text-gray-400 text-xs">Sign in to save your sessions permanently</p>
+                    )}
+                  </div>
                   <Link
-                    href="/pricing"
+                    href="/login"
                     className="text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition-colors"
                   >
-                    Upgrade
+                    Sign in
                   </Link>
-                )}
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Recent Projects */}
             {(() => {
@@ -358,31 +409,18 @@ function LibraryContent() {
             {/* CTAs */}
             <div className="space-y-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tools</p>
-              <CtaCard
-                href="/analyze"
-                icon={Guitar}
-                label="Guitar → Piano"
-                desc="Chords, tempo & key from a recording"
-                accent
-              />
-              <CtaCard
-                href="/visualizer"
-                icon={Music2}
-                label="Piano Visualizer"
-                desc="MIDI & songs with a lit keyboard"
-              />
-              <CtaCard
-                href="/producer"
-                icon={Wand2}
-                label="Producer"
-                desc="Full mixes — harmony, melody & MIDI export"
-              />
+              <CtaCard href="/analyze" icon={Guitar} label="Guitar → Piano" desc="Chords, tempo & key from a recording" accent />
+              <CtaCard href="/visualizer" icon={Music2} label="Piano Visualizer" desc="MIDI & songs with a lit keyboard" />
+              <CtaCard href="/producer" icon={Wand2} label="Producer" desc="Full mixes — harmony, melody & MIDI export" />
             </div>
 
             {/* Secondary links */}
             <div className="flex gap-4 text-xs text-gray-600">
-              <Link href="/account" className="hover:text-brand-400 transition-colors">Account settings</Link>
+              {user && <Link href="/account" className="hover:text-brand-400 transition-colors">Account settings</Link>}
               <Link href="/pricing" className="hover:text-brand-400 transition-colors">Plans & pricing</Link>
+              {!user && (
+                <Link href="/login" className="hover:text-brand-400 transition-colors">Sign in</Link>
+              )}
             </div>
           </div>
         )}
@@ -391,15 +429,11 @@ function LibraryContent() {
         {tab === "guitar" && (
           <div>
             <div className="mb-5">
-              <Link
-                href="/analyze"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
-              >
+              <Link href="/analyze" className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors">
                 <PlusCircle size={15} />
                 New analysis
               </Link>
             </div>
-
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
@@ -409,10 +443,7 @@ function LibraryContent() {
                 <Guitar size={40} className="text-gray-600 mb-4" />
                 <p className="text-gray-400 font-medium mb-1">No sessions yet</p>
                 <p className="text-gray-600 text-sm mb-5">Analyze a guitar recording to save it here.</p>
-                <Link
-                  href="/analyze"
-                  className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
-                >
+                <Link href="/analyze" className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors">
                   <PlusCircle size={15} />
                   Go to Guitar → Piano
                 </Link>
@@ -439,15 +470,11 @@ function LibraryContent() {
         {tab === "visualizer" && (
           <div>
             <div className="mb-5">
-              <Link
-                href="/visualizer"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
-              >
+              <Link href="/visualizer" className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors">
                 <Music2 size={15} />
                 Open visualizer
               </Link>
             </div>
-
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
@@ -457,10 +484,7 @@ function LibraryContent() {
                 <Music2 size={40} className="text-gray-600 mb-4" />
                 <p className="text-gray-400 font-medium mb-1">No sessions yet</p>
                 <p className="text-gray-600 text-sm mb-5">Use the visualizer to generate a session.</p>
-                <Link
-                  href="/visualizer"
-                  className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
-                >
+                <Link href="/visualizer" className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors">
                   <Music2 size={15} />
                   Open visualizer
                 </Link>
@@ -488,15 +512,11 @@ function LibraryContent() {
         {tab === "producer" && (
           <div>
             <div className="mb-5">
-              <Link
-                href="/producer"
-                className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
-              >
+              <Link href="/producer" className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors">
                 <Wand2 size={15} />
                 New analysis
               </Link>
             </div>
-
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
@@ -506,10 +526,7 @@ function LibraryContent() {
                 <Wand2 size={40} className="text-gray-600 mb-4" />
                 <p className="text-gray-400 font-medium mb-1">No sessions yet</p>
                 <p className="text-gray-600 text-sm mb-5">Analyse audio with Producer to save it here.</p>
-                <Link
-                  href="/producer"
-                  className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
-                >
+                <Link href="/producer" className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors">
                   <Wand2 size={15} />
                   Go to Producer
                 </Link>
@@ -534,13 +551,5 @@ function LibraryContent() {
         )}
       </div>
     </div>
-  );
-}
-
-export default function LibraryPage() {
-  return (
-    <RequireAuth>
-      <LibraryContent />
-    </RequireAuth>
   );
 }

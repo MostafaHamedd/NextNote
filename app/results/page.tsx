@@ -19,10 +19,15 @@ function ResultsContent() {
   const [label, setLabel] = useState("");
   const [loadError, setLoadError] = useState(false);
 
+  const isAnon = searchParams.get("anon") === "1";
+
   useEffect(() => {
     if (sessionId) {
-      // Restore from server session
-      fetch(`${API_URL}/sessions/guitar/${sessionId}`, { headers: authHeaders() })
+      // Restore from server session (authenticated or anonymous)
+      const endpoint = isAnon
+        ? `${API_URL}/sessions/anonymous/guitar/${sessionId}`
+        : `${API_URL}/sessions/guitar/${sessionId}`;
+      fetch(endpoint, { headers: authHeaders() })
         .then((r) => {
           if (!r.ok) throw new Error();
           return r.json();

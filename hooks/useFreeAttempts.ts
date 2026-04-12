@@ -3,61 +3,67 @@
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
-  getFreeAttempts,
-  incrementFreeAttempts,
-  isAccessBlocked,
   getCurrentUser,
+  authHeaders,
   MAX_FREE_ATTEMPTS,
 } from "@/lib/auth";
 import { useAuth } from "@/context/AuthContext";
+import { API_URL } from "@/lib/config";
 
 export function useFreeAttempts() {
   const router = useRouter();
   const { user } = useAuth();
-  const [attempts, setAttempts] = useState(0);
+  const [remaining, setRemaining] = useState<number | null>(null);
   const [blocked, setBlocked] = useState(false);
 
   useEffect(() => {
     if (user) {
-      setAttempts(0);
+      setRemaining(null);
       setBlocked(false);
       return;
     }
-    const count = getFreeAttempts();
-    setAttempts(count);
-    setBlocked(isAccessBlocked());
+    // Fetch server-side usage count for anonymous users
+    fetch(`${API_URL}/auth/anonymous-status`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data) return;
+        setRemaining(data.uses_remaining);
+        setBlocked(data.uses_remaining === 0);
+      })
+      .catch(() => {
+        // Fallback: assume full limit available
+        setRemaining(MAX_FREE_ATTEMPTS);
+      });
   }, [user]);
 
   /**
    * Call BEFORE making a feature API request.
-   * Returns true if the user may proceed, false if they are blocked (and will be redirected).
+   * Returns true if the user may proceed, false if they are blocked.
    */
   const checkAccess = useCallback(
     (redirectPath?: string): boolean => {
-      if (getCurrentUser()) return true; // logged-in users always proceed
-
-      if (isAccessBlocked()) {
+      if (getCurrentUser()) return true;
+      if (blocked) {
         const dest = redirectPath ? encodeURIComponent(redirectPath) : "";
         router.push(`/login?limit=true${dest ? `&next=${dest}` : ""}`);
         return false;
       }
       return true;
     },
-    [router]
+    [router, blocked]
   );
 
   /**
-   * Call AFTER a successful feature use to record the attempt.
+   * Call AFTER a successful feature use to update the local count.
    */
   const recordUsage = useCallback(() => {
-    if (getCurrentUser()) return; // don't count for authenticated users
-    incrementFreeAttempts();
-    const newCount = getFreeAttempts();
-    setAttempts(newCount);
-    setBlocked(newCount >= MAX_FREE_ATTEMPTS);
+    if (getCurrentUser()) return;
+    setRemaining((prev) => {
+      const next = Math.max(0, (prev ?? MAX_FREE_ATTEMPTS) - 1);
+      setBlocked(next === 0);
+      return next;
+    });
   }, []);
 
-  const remaining = user ? null : Math.max(0, MAX_FREE_ATTEMPTS - attempts);
-
-  return { attempts, blocked, remaining, checkAccess, recordUsage };
+  return { blocked, remaining, checkAccess, recordUsage };
 }

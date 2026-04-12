@@ -1,5 +1,6 @@
 const TOKEN_KEY = "nn_auth_token";
 const ATTEMPTS_KEY = "nn_free_attempts";
+const FINGERPRINT_KEY = "nxn_fp";
 export const AUTOPLAY_KEY = "nn_autoplay_visualizer";
 export const ANON_SESSIONS_KEY = "music-assistant-sessions";
 export const MAX_FREE_ATTEMPTS = 3;
@@ -101,9 +102,25 @@ export function clearAnonSessions(): void {
   } catch {}
 }
 
-// ── Auth fetch helper — injects Bearer token automatically ───────────────────
+// ── Fingerprint — persistent anonymous browser ID ────────────────────────────
+
+export function getFingerprint(): string {
+  if (typeof window === "undefined") return "";
+  let fp = localStorage.getItem(FINGERPRINT_KEY);
+  if (!fp) {
+    fp = crypto.randomUUID();
+    localStorage.setItem(FINGERPRINT_KEY, fp);
+  }
+  return fp;
+}
+
+// ── Auth fetch helper — injects Bearer token + fingerprint automatically ─────
 
 export function authHeaders(): HeadersInit {
   const token = getToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
+  const fp = getFingerprint();
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  if (fp) headers["X-Fingerprint-ID"] = fp;
+  return headers;
 }

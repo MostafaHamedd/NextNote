@@ -9,7 +9,8 @@ import HistorySidebar from "@/components/HistorySidebar";
 import { useSessionHistory, Session } from "@/hooks/useSessionHistory";
 import { resultStore } from "@/lib/resultStore";
 import { useAuth } from "@/context/AuthContext";
-import { getFreeAttempts, MAX_FREE_ATTEMPTS } from "@/lib/auth";
+import { authHeaders, MAX_FREE_ATTEMPTS } from "@/lib/auth";
+import { API_URL } from "@/lib/config";
 import UserMenu from "@/components/UserMenu";
 
 export default function Sidebar() {
@@ -21,7 +22,11 @@ export default function Sidebar() {
   const { sessions, deleteSession, clearAll } = useSessionHistory();
 
   useEffect(() => {
-    if (!user) setFreeUsed(getFreeAttempts());
+    if (user) return;
+    fetch(`${API_URL}/auth/anonymous-status`, { headers: authHeaders() })
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => { if (data) setFreeUsed(data.monthly_uses); })
+      .catch(() => {});
   }, [user]);
 
   useEffect(() => {
@@ -129,37 +134,58 @@ export default function Sidebar() {
             </>
           ) : (
             <>
-              {/* Anonymous order: tools first, then History */}
+              {/* Anonymous: same nav as logged-in — all features available */}
               <Link
-                href="/producer"
+                href="/library"
                 className={clsx(
                   "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                  pathname === "/producer"
+                  pathname === "/library"
                     ? "bg-brand-600 text-white"
                     : "text-gray-400 hover:text-white hover:bg-surface-3"
                 )}
               >
-                <Wand2 size={15} />
-                Producer
+                <Library size={15} />
+                Library
               </Link>
 
-              <button
-                onClick={() => setShowHistory(true)}
-                className={clsx(
-                  "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                  showHistory
-                    ? "bg-brand-600 text-white"
-                    : "text-gray-400 hover:text-white hover:bg-surface-3"
-                )}
-              >
-                <Clock size={15} />
-                History
-                {sessions.length > 0 && (
-                  <span className="ml-auto w-4 h-4 rounded-full bg-brand-500/40 text-white text-[9px] font-bold flex items-center justify-center">
-                    {sessions.length > 9 ? "9+" : sessions.length}
-                  </span>
-                )}
-              </button>
+              <div className="pl-3 space-y-0.5">
+                <Link
+                  href="/analyze"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/analyze" || pathname === "/results"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <PlusCircle size={12} />
+                  Guitar → Piano
+                </Link>
+                <Link
+                  href="/visualizer"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/visualizer" || pathname === "/visualizer/play"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <Music size={12} />
+                  Visualizer
+                </Link>
+                <Link
+                  href="/producer"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/producer"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <Wand2 size={12} />
+                  Producer
+                </Link>
+              </div>
 
               <Link
                 href="/pricing"

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Zap, Mail, Lock, Eye, EyeOff, AlertTriangle, ArrowRight } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/lib/config";
+import { getFingerprint } from "@/lib/auth";
 
 type Tab = "login" | "register";
 
@@ -16,6 +17,7 @@ export default function LoginPage() {
 
   const isLimit = searchParams.get("limit") === "true";
   const nextPath = searchParams.get("next") || "/library";
+  const oauthError = searchParams.get("oauth_error");
 
   const [tab, setTab] = useState<Tab>("login");
   const [email, setEmail] = useState("");
@@ -23,7 +25,13 @@ export default function LoginPage() {
   const [confirm, setConfirm] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(oauthError || null);
+  const [fingerprintId, setFingerprintId] = useState("");
+
+  // Resolve fingerprint client-side only to avoid SSR/CSR hydration mismatch
+  useEffect(() => {
+    setFingerprintId(getFingerprint());
+  }, []);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -48,10 +56,15 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const endpoint = tab === "login" ? "/auth/login" : "/auth/register";
+      const body: Record<string, string> = { email: email.trim().toLowerCase(), password };
+      if (tab === "register") {
+        const fp = getFingerprint();
+        if (fp) body.fingerprint_id = fp;
+      }
       const res = await fetch(`${API_URL}${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -223,6 +236,27 @@ export default function LoginPage() {
               )}
             </button>
           </form>
+
+          {/* Divider */}
+          <div className="flex items-center gap-3 my-5">
+            <div className="flex-1 h-px bg-surface-border" />
+            <span className="text-xs text-gray-600">or</span>
+            <div className="flex-1 h-px bg-surface-border" />
+          </div>
+
+          {/* Google OAuth */}
+          <a
+            href={`${API_URL}/auth/google?fingerprint_id=${encodeURIComponent(fingerprintId)}`}
+            className="flex items-center justify-center gap-3 w-full py-3 rounded-xl border border-surface-border bg-surface-3 hover:bg-surface-2 transition-colors text-sm font-medium text-gray-200"
+          >
+            <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
+              <path d="M43.6 20.5H42V20H24v8h11.3C33.6 33 29.3 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.5 6.5 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.2-.1-2.4-.4-3.5z" fill="#FFC107"/>
+              <path d="M6.3 14.7l6.6 4.8C14.6 15.1 19 12 24 12c3.1 0 5.8 1.1 7.9 3l5.7-5.7C34.5 6.5 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" fill="#FF3D00"/>
+              <path d="M24 44c5.5 0 10.4-2 14.1-5.3l-6.5-5.5C29.6 35 26.9 36 24 36c-5.3 0-9.6-3-11.3-7.5l-6.6 5.1C9.5 39.6 16.3 44 24 44z" fill="#4CAF50"/>
+              <path d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.3 4.2-4.3 5.5l6.5 5.5C37.2 40.5 44 35 44 24c0-1.2-.1-2.4-.4-3.5z" fill="#1976D2"/>
+            </svg>
+            Continue with Google
+          </a>
 
           {/* Divider / plan link */}
           <p className="text-center text-xs text-gray-600 mt-6">

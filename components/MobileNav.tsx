@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Clock, LogIn, Library } from "lucide-react";
+import { Home, LogIn, Library } from "lucide-react";
 import clsx from "clsx";
 import { useAuth } from "@/context/AuthContext";
 
@@ -19,12 +19,6 @@ function getInitials(email: string) {
 export default function MobileNav() {
   const pathname = usePathname();
   const { user } = useAuth();
-
-  const openHistory = () => {
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new Event("open-history"));
-    }
-  };
 
   const isAccountActive = pathname === "/account" || pathname === "/login" || pathname === "/pricing";
 
@@ -83,14 +77,17 @@ export default function MobileNav() {
         </>
       ) : (
         <>
-          {/* Anonymous: Home · History · Sign In */}
-          <button
-            onClick={openHistory}
-            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium text-gray-500 hover:text-gray-300 transition-colors"
+          {/* Anonymous: Home · Library · Sign In */}
+          <Link
+            href="/library"
+            className={clsx(
+              "flex-1 flex flex-col items-center justify-center gap-0.5 py-2.5 text-[11px] font-medium transition-colors",
+              pathname === "/library" ? "text-brand-400" : "text-gray-500 hover:text-gray-300"
+            )}
           >
-            <Clock size={22} strokeWidth={1.6} />
-            History
-          </button>
+            <Library size={22} strokeWidth={1.6} />
+            Library
+          </Link>
 
           <Link
             href="/login"
