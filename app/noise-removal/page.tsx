@@ -12,10 +12,10 @@ import { API_URL } from "@/lib/config";
 type PowerFreq = 50 | 60;
 type Strength = "light" | "standard" | "aggressive";
 
-const STRENGTH_PRESETS: Record<Strength, { num_harmonics: number; quality_factor: number; label: string; description: string }> = {
-  light:      { num_harmonics: 4, quality_factor: 20,  label: "Light",      description: "Barely audible hum, gentle filtering" },
-  standard:   { num_harmonics: 8, quality_factor: 10,  label: "Standard",   description: "Typical guitar interface hum" },
-  aggressive: { num_harmonics: 8, quality_factor: 5,   label: "Aggressive", description: "Heavy hum from cheap interface or bad cable" },
+const STRENGTH_PRESETS: Record<Strength, { num_harmonics: number; quality_factor: number; prop_decrease: number; label: string; description: string }> = {
+  light:      { num_harmonics: 4, quality_factor: 20, prop_decrease: 0.75, label: "Light",      description: "Barely audible hum, gentle filtering" },
+  standard:   { num_harmonics: 8, quality_factor: 10, prop_decrease: 0.9,  label: "Standard",   description: "Typical guitar interface hum" },
+  aggressive: { num_harmonics: 8, quality_factor: 5,  prop_decrease: 1.0,  label: "Aggressive", description: "Heavy hum from cheap interface or bad cable" },
 };
 
 interface NoiseRemovalResult {
@@ -56,6 +56,7 @@ export default function NoiseRemovalPage() {
         frequency: String(frequency),
         num_harmonics: String(preset.num_harmonics),
         quality_factor: String(preset.quality_factor),
+        prop_decrease: String(preset.prop_decrease),
       });
 
       const res = await fetch(`${API_URL}/noise-removal/clean?${params}`, {
