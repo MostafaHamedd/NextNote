@@ -31,6 +31,7 @@ interface NoiseRemovalResult {
   harmonics_removed: number[];
   noise_reduction_db: number;
   sample_rate: number;
+  noise_window: { start: number; end: number; auto: boolean };
 }
 
 export default function NoiseRemovalPage() {
@@ -45,6 +46,8 @@ export default function NoiseRemovalPage() {
   // Options
   const [frequency, setFrequency] = useState<PowerFreq>(60);
   const [strength, setStrength] = useState<Strength>("standard");
+  const [noiseStart, setNoiseStart] = useState("");
+  const [noiseEnd,   setNoiseEnd]   = useState("");
 
   // Audio playback URLs
   const originalUrlRef = useRef<string | null>(null);
@@ -84,11 +87,15 @@ export default function NoiseRemovalPage() {
       form.append("file", file);
 
       const params = new URLSearchParams({
-        frequency:     String(frequency),
-        num_harmonics: String(preset.num_harmonics),
+        frequency:      String(frequency),
+        num_harmonics:  String(preset.num_harmonics),
         quality_factor: String(preset.quality_factor),
         prop_decrease:  String(preset.prop_decrease),
       });
+      if (noiseStart !== "" && noiseEnd !== "") {
+        params.set("noise_start", noiseStart);
+        params.set("noise_end",   noiseEnd);
+      }
 
       const res = await fetch(`${API_URL}/noise-removal/clean?${params}`, {
         method: "POST",
@@ -206,7 +213,7 @@ export default function NoiseRemovalPage() {
             </div>
 
             {/* Strength */}
-            <div>
+            <div className="mb-5">
               <p className="text-sm text-gray-300 font-medium mb-2">Removal strength</p>
               <div className="flex gap-2">
                 {(Object.keys(STRENGTH_PRESETS) as Strength[]).map((s) => (
@@ -225,6 +232,42 @@ export default function NoiseRemovalPage() {
                 ))}
               </div>
               <p className="text-xs text-gray-600 mt-1.5">{STRENGTH_PRESETS[strength].description}.</p>
+            </div>
+
+            {/* Noise sample window */}
+            <div className="border-t border-surface-border pt-4">
+              <p className="text-sm text-gray-300 font-medium mb-1">Noise sample window <span className="text-gray-600 font-normal">(optional)</span></p>
+              <p className="text-xs text-gray-600 mb-3">
+                A time range in your recording where <strong className="text-gray-400">only the hum is present</strong> — no guitar playing.
+                Leave blank to auto-detect the quietest section.
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-wide mb-1 block">Start (s)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="e.g. 0"
+                    value={noiseStart}
+                    onChange={(e) => setNoiseStart(e.target.value)}
+                    className="w-full bg-surface-3 border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500/60"
+                  />
+                </div>
+                <span className="text-gray-600 mt-5">→</span>
+                <div className="flex-1">
+                  <label className="text-[10px] text-gray-500 uppercase tracking-wide mb-1 block">End (s)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.1"
+                    placeholder="e.g. 1"
+                    value={noiseEnd}
+                    onChange={(e) => setNoiseEnd(e.target.value)}
+                    className="w-full bg-surface-3 border border-surface-border rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-teal-500/60"
+                  />
+                </div>
+              </div>
             </div>
           </div>
         )}
@@ -281,6 +324,12 @@ export default function NoiseRemovalPage() {
                   <p className="text-2xl font-bold text-teal-400">{result.noise_reduction_db} dB</p>
                   <p className="text-xs text-gray-500 mt-1">Noise floor</p>
                 </div>
+              </div>
+
+              {/* Noise window used */}
+              <div className="bg-surface-3/50 rounded-xl px-4 py-3 text-xs text-gray-500">
+                Noise sample: {result.noise_window.start}s – {result.noise_window.end}s
+                {result.noise_window.auto && <span className="ml-1 text-gray-600">(auto-detected)</span>}
               </div>
 
               {/* Notched frequencies */}
