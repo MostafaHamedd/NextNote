@@ -7,13 +7,15 @@ import clsx from "clsx";
 import AudioRecorder from "@/components/AudioRecorder";
 import FileUpload from "@/components/FileUpload";
 import LoadingState from "@/components/LoadingState";
+// import SongSearchInput from "@/components/sheet/SongSearchInput";  // song harmony feature (disabled)
 import { useSessionHistory } from "@/hooks/useSessionHistory";
 import { resultStore } from "@/lib/resultStore";
 import { useFreeAttempts } from "@/hooks/useFreeAttempts";
+import { usePlatform } from "@/context/PlatformContext";
 import { authHeaders } from "@/lib/auth";
 import { API_URL } from "@/lib/config";
 
-type Tab = "record" | "upload";
+type Tab = "record" | "upload"; // | "song"  — song harmony feature (disabled)
 
 export default function AnalyzePage() {
   const router = useRouter();
@@ -21,7 +23,9 @@ export default function AnalyzePage() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { saveSession } = useSessionHistory();
+  const { free_mode } = usePlatform();
   const { remaining, checkAccess, recordUsage } = useFreeAttempts();
+  const [songQuery, setSongQuery] = useState("");
 
   const analyzeAudio = useCallback(
     async (audioData: Blob | File, label?: string) => {
@@ -86,6 +90,48 @@ export default function AnalyzePage() {
     [saveSession, router, checkAccess, recordUsage]
   );
 
+  const analyzeSong = useCallback(
+    async (title: string) => {
+      if (!title.trim()) return;
+      if (!checkAccess("/analyze")) return;
+
+      setIsAnalyzing(true);
+      setError(null);
+
+      try {
+        const res = await fetch(`${API_URL}/song-harmony-analysis`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeaders() },
+          body: JSON.stringify({ title: title.trim() }),
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.detail || `Server error: ${res.status}`);
+        }
+
+        const data = await res.json();
+        recordUsage();
+
+        resultStore.set({
+          analysis: data.analysis,
+          feedback: data.feedback,
+          audioBlob: null,
+          label: data.sheet_data?.title || title.trim(),
+          source: "song",
+          sheet_data: data.sheet_data,
+        });
+
+        router.push("/results");
+      } catch (e: any) {
+        setError(e.message || "Something went wrong. Is the backend running?");
+      } finally {
+        setIsAnalyzing(false);
+      }
+    },
+    [router, checkAccess, recordUsage]
+  );
+
   return (
     <div className="min-h-screen bg-surface relative overflow-hidden">
       <div
@@ -117,8 +163,8 @@ export default function AnalyzePage() {
             Record or upload your guitar idea. Get chords, key, tempo, and a piano view—then download MIDI of the chord progression for Logic Pro or any DAW.
           </p>
 
-          {/* Free attempt indicator (anonymous only) */}
-          {remaining !== null && remaining > 0 && (
+          {/* Free attempt indicator (anonymous only, hidden in free_mode) */}
+          {!free_mode && remaining !== null && remaining > 0 && (
             <div className="inline-flex items-center gap-2 mt-4 bg-surface-3/60 border border-surface-border rounded-full px-4 py-1.5">
               <Lock size={12} className="text-gray-500" />
               <span className="text-xs text-gray-400">
@@ -134,6 +180,7 @@ export default function AnalyzePage() {
             {([
               { id: "record" as Tab, label: "Record", icon: Mic },
               { id: "upload" as Tab, label: "Upload File", icon: Upload },
+              // { id: "song" as Tab, label: "Song", icon: Music },  // song harmony feature (disabled)
             ] as const).map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -151,11 +198,28 @@ export default function AnalyzePage() {
             ))}
           </div>
 
-          {tab === "record" ? (
+          {tab === "record" && (
             <AudioRecorder onAudioReady={analyzeAudio} isAnalyzing={isAnalyzing} />
-          ) : (
+          )}
+          {tab === "upload" && (
             <FileUpload onFileSelected={analyzeAudio} isAnalyzing={isAnalyzing} />
           )}
+          {/* song harmony tab disabled
+          {tab === "song" && (
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500 text-center">
+                Search a song title to get harmony analysis from MIDI
+              </p>
+              <SongSearchInput
+                value={songQuery}
+                onChange={setSongQuery}
+                onSubmit={analyzeSong}
+                disabled={isAnalyzing}
+                searchEndpoint={`${API_URL}/search-songs`}
+              />
+            </div>
+          )}
+          */}
         </div>
 
         {isAnalyzing && (

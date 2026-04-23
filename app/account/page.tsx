@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuth } from "@/context/AuthContext";
+import { usePlatform } from "@/context/PlatformContext";
 import { getToken, authHeaders, AUTOPLAY_KEY } from "@/lib/auth";
 import { API_URL } from "@/lib/config";
 
@@ -130,9 +131,16 @@ function Toast({ message, type }: { message: string; type: "success" | "error" }
 
 function AccountContent() {
   const { user, logout } = useAuth();
+  const { free_mode } = usePlatform();
   const router = useRouter();
 
   const [activeSection, setActiveSection] = useState<SectionKey>("profile");
+
+  useEffect(() => {
+    if (free_mode && (activeSection === "subscription" || activeSection === "billing")) {
+      setActiveSection("profile");
+    }
+  }, [free_mode, activeSection]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const [pwForm, setPwForm] = useState({ current: "", next: "", confirm: "" });
@@ -292,14 +300,14 @@ function AccountContent() {
               </div>
               <p className="text-xs text-gray-400">{plan.description}</p>
             </div>
-            {user.plan === "free" ? (
+            {user.plan === "free" && !free_mode ? (
               <Link
                 href="/pricing"
                 className="flex items-center gap-1 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition-colors shrink-0"
               >
                 Upgrade <ChevronRight size={12} />
               </Link>
-            ) : (
+            ) : user.plan !== "free" ? (
               <button
                 onClick={handleManageSubscription}
                 disabled={portalLoading}
@@ -307,7 +315,7 @@ function AccountContent() {
               >
                 {portalLoading ? "Opening…" : "Manage"} <ChevronRight size={12} />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
         <Row
@@ -343,12 +351,14 @@ function AccountContent() {
         {user.plan === "free" ? (
           <div className="px-5 py-6 text-center">
             <p className="text-sm text-gray-400 mb-3">No billing on the free plan.</p>
-            <Link
-              href="/pricing"
-              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
-            >
-              Upgrade to Pro <ArrowRight size={12} />
-            </Link>
+            {!free_mode && (
+              <Link
+                href="/pricing"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors"
+              >
+                Upgrade to Pro <ArrowRight size={12} />
+              </Link>
+            )}
           </div>
         ) : (
           <>
@@ -452,7 +462,7 @@ function AccountContent() {
       <div className="glass rounded-2xl overflow-hidden divide-y divide-surface-border">
         <div className="flex items-center justify-between px-5 py-4">
           <div>
-            <p className="text-sm font-medium text-white">Auto-play visualizer</p>
+            <p className="text-sm font-medium text-white">Auto-play piano visualizer</p>
             <p className="text-xs text-gray-500 mt-0.5">Start playback automatically when a song loads</p>
           </div>
           <ToggleSwitch checked={autoPlay} onChange={toggleAutoPlay} />
@@ -535,7 +545,7 @@ function AccountContent() {
         <div className="flex gap-6 items-start">
           {/* Left nav */}
           <nav className="w-52 shrink-0 glass rounded-2xl overflow-hidden divide-y divide-surface-border">
-            {NAV_ITEMS.map(({ key, label, icon: Icon, danger }) => (
+            {NAV_ITEMS.filter(({ key }) => !free_mode || (key !== "subscription" && key !== "billing")).map(({ key, label, icon: Icon, danger }) => (
               <button
                 key={key}
                 onClick={() => setActiveSection(key)}

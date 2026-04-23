@@ -16,7 +16,7 @@ import { API_URL } from "@/lib/config";
 type Tab = "learn" | "midi";
 
 const TABS: { id: Tab; label: string; icon: React.ElementType }[] = [
-  { id: "learn", label: "Piano Visualizer", icon: BookOpen },
+  { id: "learn", label: "Piano visualizer", icon: BookOpen },
   { id: "midi", label: "Upload MIDI", icon: Music2 },
 ];
 
@@ -110,9 +110,9 @@ export default function VisualizerPage() {
         <div className="text-center mb-10">
           <div className="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-4 py-1.5 mb-5">
             <Music size={14} className="text-brand-400" />
-            <span className="text-sm font-medium text-brand-300">Piano Visualizer</span>
+            <span className="text-sm font-medium text-brand-300">Piano visualizer</span>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-3">Visualizer</h1>
+          <h1 className="text-3xl font-bold text-white mb-3">Piano visualizer</h1>
           <p className="text-gray-400 text-sm max-w-md mx-auto leading-relaxed">
             Search a song by name or upload a MIDI file — follow along on the piano keyboard.
           </p>

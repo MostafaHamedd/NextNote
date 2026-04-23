@@ -7,11 +7,12 @@ import clsx from "clsx";
 interface FileUploadProps {
   onFileSelected: (file: File) => void;
   isAnalyzing: boolean;
+  submitLabel?: string;
 }
 
 const ACCEPTED = ".wav,.mp3,.m4a,.ogg,.flac,.aiff,.webm";
 
-export default function FileUpload({ onFileSelected, isAnalyzing }: FileUploadProps) {
+export default function FileUpload({ onFileSelected, isAnalyzing, submitLabel = "Get chords" }: FileUploadProps) {
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -139,7 +140,7 @@ export default function FileUpload({ onFileSelected, isAnalyzing }: FileUploadPr
           className="flex items-center justify-center gap-2 w-full py-3 bg-gradient-to-r from-brand-600 to-accent-purple rounded-full font-semibold text-white hover:opacity-90 transition-all hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 shadow-lg shadow-brand-900/40"
         >
           <Send size={16} />
-          {isAnalyzing ? "Working…" : "Get chords"}
+          {isAnalyzing ? "Working…" : submitLabel}
         </button>
       )}
     </div>

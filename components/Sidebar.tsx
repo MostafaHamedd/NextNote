@@ -2,13 +2,14 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Clock, Crown, LogIn, Zap, Library, Wand2, PlusCircle, Music } from "lucide-react";
+import { Clock, Crown, LogIn, Zap, Library, Wand2, PlusCircle, Music, Radio, Headphones, Filter } from "lucide-react";
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import HistorySidebar from "@/components/HistorySidebar";
 import { useSessionHistory, Session } from "@/hooks/useSessionHistory";
 import { resultStore } from "@/lib/resultStore";
 import { useAuth } from "@/context/AuthContext";
+import { usePlatform } from "@/context/PlatformContext";
 import { authHeaders, MAX_FREE_ATTEMPTS } from "@/lib/auth";
 import { API_URL } from "@/lib/config";
 import UserMenu from "@/components/UserMenu";
@@ -17,6 +18,7 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
+  const { free_mode, producer_enabled } = usePlatform();
   const [showHistory, setShowHistory] = useState(false);
   const [freeUsed, setFreeUsed] = useState(0);
   const { sessions, deleteSession, clearAll } = useSessionHistory();
@@ -103,34 +105,79 @@ export default function Sidebar() {
                   )}
                 >
                   <Music size={12} />
-                  Visualizer
+                  Piano visualizer
                 </Link>
+                {producer_enabled ? (
+                  <Link
+                    href="/producer"
+                    className={clsx(
+                      "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                      pathname === "/producer"
+                        ? "text-brand-400 border-brand-500/50"
+                        : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                    )}
+                  >
+                    <Wand2 size={12} />
+                    Producer
+                  </Link>
+                ) : (
+                  <span className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium border-l border-surface-border ml-1 text-gray-700 cursor-not-allowed">
+                    <Wand2 size={12} />
+                    Producer
+                  </span>
+                )}
                 <Link
-                  href="/producer"
+                  href="/live"
                   className={clsx(
                     "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/producer"
+                    pathname === "/live"
                       ? "text-brand-400 border-brand-500/50"
                       : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
                   )}
                 >
-                  <Wand2 size={12} />
-                  Producer
+                  <Radio size={12} />
+                  Live Detector
+                </Link>
+                <Link
+                  href="/ear-training"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/ear-training"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <Headphones size={12} />
+                  Ear Training
+                </Link>
+                <Link
+                  href="/noise-removal"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/noise-removal"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <Filter size={12} />
+                  Noise Removal
                 </Link>
               </div>
 
-              <Link
-                href="/pricing"
-                className={clsx(
-                  "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                  pathname === "/pricing"
-                    ? "bg-brand-600 text-white"
-                    : "text-gray-400 hover:text-white hover:bg-surface-3"
-                )}
-              >
-                <Crown size={15} />
-                Pricing
-              </Link>
+              {!free_mode && (
+                <Link
+                  href="/pricing"
+                  className={clsx(
+                    "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
+                    pathname === "/pricing"
+                      ? "bg-brand-600 text-white"
+                      : "text-gray-400 hover:text-white hover:bg-surface-3"
+                  )}
+                >
+                  <Crown size={15} />
+                  Pricing
+                </Link>
+              )}
             </>
           ) : (
             <>
@@ -171,34 +218,79 @@ export default function Sidebar() {
                   )}
                 >
                   <Music size={12} />
-                  Visualizer
+                  Piano visualizer
                 </Link>
+                {producer_enabled ? (
+                  <Link
+                    href="/producer"
+                    className={clsx(
+                      "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                      pathname === "/producer"
+                        ? "text-brand-400 border-brand-500/50"
+                        : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                    )}
+                  >
+                    <Wand2 size={12} />
+                    Producer
+                  </Link>
+                ) : (
+                  <span className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium border-l border-surface-border ml-1 text-gray-700 cursor-not-allowed">
+                    <Wand2 size={12} />
+                    Producer
+                  </span>
+                )}
                 <Link
-                  href="/producer"
+                  href="/live"
                   className={clsx(
                     "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/producer"
+                    pathname === "/live"
                       ? "text-brand-400 border-brand-500/50"
                       : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
                   )}
                 >
-                  <Wand2 size={12} />
-                  Producer
+                  <Radio size={12} />
+                  Live Detector
+                </Link>
+                <Link
+                  href="/ear-training"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/ear-training"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <Headphones size={12} />
+                  Ear Training
+                </Link>
+                <Link
+                  href="/noise-removal"
+                  className={clsx(
+                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
+                    pathname === "/noise-removal"
+                      ? "text-brand-400 border-brand-500/50"
+                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
+                  )}
+                >
+                  <Filter size={12} />
+                  Noise Removal
                 </Link>
               </div>
 
-              <Link
-                href="/pricing"
-                className={clsx(
-                  "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                  pathname === "/pricing"
-                    ? "bg-brand-600 text-white"
-                    : "text-gray-400 hover:text-white hover:bg-surface-3"
-                )}
-              >
-                <Crown size={15} />
-                Pricing
-              </Link>
+              {!free_mode && (
+                <Link
+                  href="/pricing"
+                  className={clsx(
+                    "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
+                    pathname === "/pricing"
+                      ? "bg-brand-600 text-white"
+                      : "text-gray-400 hover:text-white hover:bg-surface-3"
+                  )}
+                >
+                  <Crown size={15} />
+                  Pricing
+                </Link>
+              )}
             </>
           )}
         </nav>
@@ -209,7 +301,7 @@ export default function Sidebar() {
         ) : (
           <div className="px-2 py-3 border-t border-surface-border shrink-0 space-y-1">
             {/* Free attempt progress */}
-            {freeUsed < MAX_FREE_ATTEMPTS && (
+            {!free_mode && freeUsed < MAX_FREE_ATTEMPTS && (
               <div className="px-3 py-2">
                 <div className="flex justify-between text-[10px] text-gray-500 mb-1">
                   <span>Free uses</span>

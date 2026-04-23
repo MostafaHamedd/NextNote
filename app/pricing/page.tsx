@@ -30,7 +30,7 @@ const PLANS = [
       "Session history (20 saves)",
     ],
     missing: [
-      "Piano Visualizer",
+      "Piano visualizer",
       "MIDI upload",
       "Sheet music recognition",
       "Unlimited analyses",
@@ -52,7 +52,7 @@ const PLANS = [
     features: [
       "Everything in Free",
       "Unlimited monthly analyses",
-      "Piano Visualizer",
+      "Piano visualizer",
       "MIDI file upload & playback",
       "Sheet music recognition (GPT-4o)",
       "Priority processing",

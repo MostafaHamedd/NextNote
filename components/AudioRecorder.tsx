@@ -110,7 +110,7 @@ export default function AudioRecorder({ onAudioReady, isAnalyzing }: AudioRecord
 
   return (
     <div className="flex flex-col items-center gap-6">
-      {/* Visualizer */}
+      {/* Piano visualizer (waveform) */}
       <div className="relative flex items-center justify-center w-full h-20 gap-[3px]">
         {levels.map((h, i) => (
           <div

@@ -10,6 +10,8 @@ export interface StoredResult {
   feedback: any;
   audioBlob: Blob | File | null;
   label: string;
+  source?: "guitar" | "song";
+  sheet_data?: any;
 }
 
 let _store: StoredResult | null = null;

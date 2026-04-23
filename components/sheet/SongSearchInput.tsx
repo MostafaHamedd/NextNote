@@ -19,9 +19,10 @@ interface Props {
   onChange: (v: string) => void;
   onSubmit: (title: string) => void;
   disabled?: boolean;
+  searchEndpoint?: string;
 }
 
-export default function SongSearchInput({ value, onChange, onSubmit, disabled }: Props) {
+export default function SongSearchInput({ value, onChange, onSubmit, disabled, searchEndpoint }: Props) {
   const [results, setResults]             = useState<SongResult[]>([]);
   const [highlightIdx, setHighlightIdx]   = useState(-1);
   const [showDropdown, setShowDropdown]   = useState(false);
@@ -55,8 +56,9 @@ export default function SongSearchInput({ value, onChange, onSubmit, disabled }:
 
     setSearching(true);
     try {
+      const endpoint = searchEndpoint ?? `${API_URL}/search-songs`;
       const res = await fetch(
-        `${API_URL}/search-songs?q=${encodeURIComponent(query)}`,
+        `${endpoint}?q=${encodeURIComponent(query)}`,
         { signal: abortRef.current.signal },
       );
       if (!res.ok) throw new Error("search failed");
@@ -106,7 +108,7 @@ export default function SongSearchInput({ value, onChange, onSubmit, disabled }:
           value={value}
           autoComplete="off"
           disabled={disabled}
-          placeholder="Search any song or piece…"
+          placeholder="Song name or Song - Artist…"
           className="w-full pl-9 pr-4 py-2.5 bg-surface-3 border border-surface-border rounded-xl text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand-500/60 transition-colors disabled:opacity-50"
           onChange={e => handleChange(e.target.value)}
           onFocus={() => { if (results.length > 0) setShowDropdown(true); }}

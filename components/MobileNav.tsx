@@ -44,7 +44,7 @@ export default function MobileNav() {
 
       {user ? (
         <>
-          {/* Logged-in: Home · Library · Analyze · Visualizer · Account */}
+          {/* Logged-in: Home · Library · Account (tools live under Library) */}
           <Link
             href="/library"
             className={clsx(

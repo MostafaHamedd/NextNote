@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Music2 } from "lucide-react";
+import { ArrowLeft, Music2, Info } from "lucide-react";
 import AnalysisResult from "@/components/AnalysisResult";
 import { resultStore } from "@/lib/resultStore";
 import { authHeaders } from "@/lib/auth";
@@ -17,6 +17,7 @@ function ResultsContent() {
   const [data, setData] = useState<{ analysis: any; feedback: any } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [label, setLabel] = useState("");
+  const [source, setSource] = useState<string | undefined>(undefined);
   const [loadError, setLoadError] = useState(false);
 
   const isAnon = searchParams.get("anon") === "1";
@@ -52,6 +53,7 @@ function ResultsContent() {
 
     setData({ analysis: stored.analysis, feedback: stored.feedback });
     setLabel(stored.label);
+    setSource(stored.source);
 
     if (stored.audioBlob) {
       const url = URL.createObjectURL(stored.audioBlob);
@@ -85,7 +87,7 @@ function ResultsContent() {
             className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-300 transition-colors"
           >
             <ArrowLeft size={14} />
-            {sessionId ? "Library" : "Guitar → Piano"}
+            {sessionId ? "Library" : source === "song" ? "Song Analysis" : "Guitar → Piano"}
           </Link>
           {label && (
             <div className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -95,19 +97,31 @@ function ResultsContent() {
           )}
         </div>
 
-        {/* Audio player */}
-        <div className="glass rounded-2xl p-5 mb-6 border border-surface-border">
-          <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">
-            Playback
-          </p>
-          {audioUrl ? (
-            <audio controls src={audioUrl} className="w-full rounded-xl h-10" />
-          ) : (
-            <p className="text-xs text-gray-600 italic">
-              Audio not available for restored sessions
+        {/* Song source banner */}
+        {source === "song" && (
+          <div className="flex items-start gap-3 bg-brand-900/20 border border-brand-800/40 rounded-2xl px-4 py-3 mb-6 text-sm text-brand-300">
+            <Info size={15} className="shrink-0 mt-0.5 text-brand-400" />
+            <span>
+              Harmony derived from a <strong>reference MIDI arrangement</strong> — chord accuracy depends on MIDI quality. Sonic Feel values are placeholder estimates.
+            </span>
+          </div>
+        )}
+
+        {/* Audio player (guitar path only) */}
+        {source !== "song" && (
+          <div className="glass rounded-2xl p-5 mb-6 border border-surface-border">
+            <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-3">
+              Playback
             </p>
-          )}
-        </div>
+            {audioUrl ? (
+              <audio controls src={audioUrl} className="w-full rounded-xl h-10" />
+            ) : (
+              <p className="text-xs text-gray-600 italic">
+                Audio not available for restored sessions
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Analysis */}
         <AnalysisResult analysis={data.analysis} feedback={data.feedback} />

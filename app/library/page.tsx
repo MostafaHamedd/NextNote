@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import clsx from "clsx";
 import { useAuth } from "@/context/AuthContext";
+import { usePlatform } from "@/context/PlatformContext";
 import { authHeaders, getFingerprint } from "@/lib/auth";
 import { sheetStore } from "@/lib/sheetStore";
 import { resultStore } from "@/lib/resultStore";
@@ -156,6 +157,7 @@ async function parseJsonIfOk(res: Response): Promise<unknown | null> {
 
 export default function LibraryPage() {
   const { user, token } = useAuth();
+  const { free_mode, producer_enabled } = usePlatform();
   const router = useRouter();
 
   const [tab, setTab] = useState<Tab>("overview");
@@ -258,7 +260,7 @@ export default function LibraryPage() {
   const TABS: { id: Tab; label: string }[] = [
     { id: "overview", label: "Overview" },
     { id: "guitar", label: "Guitar" },
-    { id: "visualizer", label: "Visualizer" },
+    { id: "visualizer", label: "Piano visualizer" },
     { id: "producer", label: "Producer" },
   ];
 
@@ -320,7 +322,7 @@ export default function LibraryPage() {
                       </p>
                     )}
                   </div>
-                  {me?.plan === "free" && (
+                  {me?.plan === "free" && !free_mode && (
                     <Link
                       href="/pricing"
                       className="text-xs font-semibold text-white bg-brand-600 hover:bg-brand-500 px-3 py-1.5 rounded-lg transition-colors"
@@ -341,7 +343,7 @@ export default function LibraryPage() {
                       <Lock size={14} className="text-gray-400" />
                       <span className="font-bold text-sm text-gray-300">Guest</span>
                     </div>
-                    {anonStatus ? (
+                    {!free_mode && anonStatus ? (
                       <p className="text-gray-400 text-xs">
                         {anonStatus.monthly_uses} / {anonStatus.limit} free analyses used
                         {anonStatus.uses_remaining === 0 ? " — limit reached" : ""}
@@ -410,14 +412,14 @@ export default function LibraryPage() {
             <div className="space-y-3">
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tools</p>
               <CtaCard href="/analyze" icon={Guitar} label="Guitar → Piano" desc="Chords, tempo & key from a recording" accent />
-              <CtaCard href="/visualizer" icon={Music2} label="Piano Visualizer" desc="MIDI & songs with a lit keyboard" />
-              <CtaCard href="/producer" icon={Wand2} label="Producer" desc="Full mixes — harmony, melody & MIDI export" />
+              <CtaCard href="/visualizer" icon={Music2} label="Piano visualizer" desc="MIDI & songs with a lit keyboard" />
+              {producer_enabled && <CtaCard href="/producer" icon={Wand2} label="Producer" desc="Full mixes — harmony, melody & MIDI export" />}
             </div>
 
             {/* Secondary links */}
             <div className="flex gap-4 text-xs text-gray-600">
               {user && <Link href="/account" className="hover:text-brand-400 transition-colors">Account settings</Link>}
-              <Link href="/pricing" className="hover:text-brand-400 transition-colors">Plans & pricing</Link>
+              {!free_mode && <Link href="/pricing" className="hover:text-brand-400 transition-colors">Plans & pricing</Link>}
               {!user && (
                 <Link href="/login" className="hover:text-brand-400 transition-colors">Sign in</Link>
               )}
@@ -466,13 +468,13 @@ export default function LibraryPage() {
           </div>
         )}
 
-        {/* ── Visualizer tab ───────────────────────────────────────────── */}
+        {/* ── Piano visualizer tab ─────────────────────────────────────── */}
         {tab === "visualizer" && (
           <div>
             <div className="mb-5">
               <Link href="/visualizer" className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors">
                 <Music2 size={15} />
-                Open visualizer
+                Open piano visualizer
               </Link>
             </div>
             {loading ? (
@@ -483,10 +485,10 @@ export default function LibraryPage() {
               <div className="flex flex-col items-center justify-center py-20 text-center">
                 <Music2 size={40} className="text-gray-600 mb-4" />
                 <p className="text-gray-400 font-medium mb-1">No sessions yet</p>
-                <p className="text-gray-600 text-sm mb-5">Use the visualizer to generate a session.</p>
+                <p className="text-gray-600 text-sm mb-5">Use the piano visualizer to generate a session.</p>
                 <Link href="/visualizer" className="flex items-center gap-2 text-sm font-semibold text-white bg-brand-600 hover:bg-brand-500 px-4 py-2 rounded-xl transition-colors">
                   <Music2 size={15} />
-                  Open visualizer
+                  Open piano visualizer
                 </Link>
               </div>
             ) : (

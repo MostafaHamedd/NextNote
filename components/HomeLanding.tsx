@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Zap, Guitar, Piano, ArrowRight, Library, Wand2 } from "lucide-react";
+import { Zap, Guitar, Piano, ArrowRight, Library, Wand2, Filter } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
 export default function HomeLanding() {
@@ -93,6 +93,20 @@ export default function HomeLanding() {
               <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Melody MIDI export for Logic Pro from any audio</p>
             </div>
             <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
+          </Link>
+
+          <Link
+            href="/noise-removal"
+            className="group flex items-center gap-4 w-full glass rounded-2xl border border-surface-border p-4 sm:p-5 text-left transition-all hover:border-teal-500/40 hover:bg-teal-500/5"
+          >
+            <div className="p-3 rounded-xl bg-teal-600/15 text-teal-400 shrink-0">
+              <Filter size={22} strokeWidth={1.75} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-white text-sm sm:text-base">Noise Removal</p>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Strip 50/60 Hz power line hum from any recording</p>
+            </div>
+            <ArrowRight size={18} className="text-gray-600 group-hover:text-teal-400 shrink-0 transition-colors" />
           </Link>
 
           {!user && (

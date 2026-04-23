@@ -193,6 +193,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
         chord_sequence: analysis.chord_sequence ?? analysis.chords,
         bpm: analysis.bpm,
         double_octave: doubleOctave,
+        duration_seconds: analysis.duration_seconds,
       };
       if (timed && analysis.chord_timeline?.length) {
         body.chord_timeline = analysis.chord_timeline;

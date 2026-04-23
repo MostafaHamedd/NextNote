@@ -8,6 +8,7 @@ import FileUpload from "@/components/FileUpload";
 import ProducerResult, { type ProducerData } from "@/components/ProducerResult";
 import { authHeaders } from "@/lib/auth";
 import { useFreeAttempts } from "@/hooks/useFreeAttempts";
+import { usePlatform } from "@/context/PlatformContext";
 import { API_URL } from "@/lib/config";
 
 type Grid = "1/8" | "1/16";
@@ -17,6 +18,7 @@ function ProducerPageInner() {
   const sessionId = searchParams.get("session");
   const isAnon = searchParams.get("anon") === "1";
 
+  const { producer_enabled } = usePlatform();
   const { remaining, checkAccess, recordUsage } = useFreeAttempts();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -97,6 +99,20 @@ function ProducerPageInner() {
     }
   }, [snapToKey, grid, padMode, bpmOverride, checkAccess, recordUsage]);
 
+  if (!producer_enabled) {
+    return (
+      <div className="min-h-screen bg-surface flex items-center justify-center">
+        <div className="text-center max-w-sm px-6">
+          <div className="w-14 h-14 bg-surface-3 rounded-2xl flex items-center justify-center mx-auto mb-5">
+            <Wand2 size={24} className="text-gray-600" />
+          </div>
+          <h1 className="text-xl font-bold text-white mb-2">Producer is unavailable</h1>
+          <p className="text-gray-500 text-sm">This feature is currently turned off. Check back later.</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-surface relative overflow-hidden">
       <div
@@ -126,7 +142,7 @@ function ProducerPageInner() {
             and a downloadable MIDI melody line ready to drag into Logic Pro.
           </p>
 
-          {remaining !== null && remaining > 0 && (
+          {!free_mode && remaining !== null && remaining > 0 && (
             <div className="inline-flex items-center gap-2 mt-4 bg-surface-3/60 border border-surface-border rounded-full px-4 py-1.5">
               <span className="text-xs text-gray-400">
                 {remaining} free {remaining === 1 ? "analysis" : "analyses"} remaining —{" "}

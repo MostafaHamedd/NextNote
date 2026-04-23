@@ -50,7 +50,7 @@ const BLACK_KEYS: { note: string; x: number }[] = [
 
 const PIANO_WIDTH = 600;
 
-/** MIDI numbers for every key on this keyboard (same FluidR3 samples as the visualizer). */
+/** MIDI numbers for every key on this keyboard (same FluidR3 samples as the piano visualizer). */
 const PIANO_KEY_MIDIS = Array.from(
   new Set(
     [...WHITE_KEYS, ...BLACK_KEYS]
@@ -96,7 +96,7 @@ export default function PianoView({ chordData, bpm, onClose }: PianoViewProps) {
   const activeChord = chordData[activeIdx] ?? chordData[0];
   const activeNotes = new Set(activeChord?.notes ?? []);
 
-  // Same MusyngKite grand-piano chain as usePianoSampler (visualizer).
+  // Same MusyngKite grand-piano chain as usePianoSampler (piano visualizer).
   useEffect(() => {
     let cancelled = false;
     setSamplerReady(false);
