@@ -10,6 +10,13 @@ import { usePlatform } from "@/context/PlatformContext";
 import { API_URL } from "@/lib/config";
 
 type PowerFreq = 50 | 60;
+type Strength = "light" | "standard" | "aggressive";
+
+const STRENGTH_PRESETS: Record<Strength, { num_harmonics: number; quality_factor: number; label: string; description: string }> = {
+  light:      { num_harmonics: 4, quality_factor: 20,  label: "Light",      description: "Barely audible hum, gentle filtering" },
+  standard:   { num_harmonics: 8, quality_factor: 10,  label: "Standard",   description: "Typical guitar interface hum" },
+  aggressive: { num_harmonics: 8, quality_factor: 5,   label: "Aggressive", description: "Heavy hum from cheap interface or bad cable" },
+};
 
 interface NoiseRemovalResult {
   cleaned_audio_b64: string;
@@ -30,7 +37,7 @@ export default function NoiseRemovalPage() {
 
   // Options
   const [frequency, setFrequency] = useState<PowerFreq>(60);
-  const [numHarmonics, setNumHarmonics] = useState(4);
+  const [strength, setStrength] = useState<Strength>("standard");
 
   const handleFile = useCallback(async (file: File) => {
     if (!checkAccess("/noise-removal")) return;
@@ -39,13 +46,16 @@ export default function NoiseRemovalPage() {
     setError(null);
     setFilename(file.name.replace(/\.[^.]+$/, ""));
 
+    const preset = STRENGTH_PRESETS[strength];
+
     try {
       const form = new FormData();
       form.append("file", file);
 
       const params = new URLSearchParams({
         frequency: String(frequency),
-        num_harmonics: String(numHarmonics),
+        num_harmonics: String(preset.num_harmonics),
+        quality_factor: String(preset.quality_factor),
       });
 
       const res = await fetch(`${API_URL}/noise-removal/clean?${params}`, {
@@ -67,7 +77,7 @@ export default function NoiseRemovalPage() {
     } finally {
       setIsProcessing(false);
     }
-  }, [frequency, numHarmonics, checkAccess, recordUsage]);
+  }, [frequency, strength, checkAccess, recordUsage]);
 
   const downloadCleaned = () => {
     if (!result) return;
@@ -106,8 +116,8 @@ export default function NoiseRemovalPage() {
             Remove power line hum
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
-            Upload any audio recording. Precision notch filters silently strip 50 Hz or 60 Hz
-            electrical hum and its harmonics, leaving your music intact.
+            Upload any audio recording. Zero-phase notch filters strip 50 Hz or 60 Hz
+            electrical hum and up to 8 harmonics, leaving your music intact.
           </p>
 
           {!free_mode && remaining !== null && remaining > 0 && (
@@ -131,7 +141,7 @@ export default function NoiseRemovalPage() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4">Options</p>
 
             {/* Power line frequency */}
-            <div className="mb-4">
+            <div className="mb-5">
               <p className="text-sm text-gray-300 font-medium mb-2">Power line frequency</p>
               <div className="flex gap-2">
                 {([60, 50] as PowerFreq[]).map((f) => (
@@ -149,34 +159,29 @@ export default function NoiseRemovalPage() {
                   </button>
                 ))}
               </div>
-              <p className="text-xs text-gray-600 mt-1.5">
-                Match your region's mains frequency for best results.
-              </p>
+              <p className="text-xs text-gray-600 mt-1.5">Match your region's mains frequency.</p>
             </div>
 
-            {/* Harmonics */}
+            {/* Strength */}
             <div>
-              <p className="text-sm text-gray-300 font-medium mb-1">Harmonics to remove</p>
-              <p className="text-xs text-gray-600 mb-2">
-                Removes the fundamental plus up to {numHarmonics} harmonic{numHarmonics > 1 ? "s" : ""} ({" "}
-                {Array.from({ length: numHarmonics }, (_, i) => `${frequency * (i + 1)} Hz`).join(", ")}).
-              </p>
+              <p className="text-sm text-gray-300 font-medium mb-2">Removal strength</p>
               <div className="flex gap-2">
-                {[1, 2, 3, 4].map((n) => (
+                {(Object.keys(STRENGTH_PRESETS) as Strength[]).map((s) => (
                   <button
-                    key={n}
-                    onClick={() => setNumHarmonics(n)}
+                    key={s}
+                    onClick={() => setStrength(s)}
                     className={clsx(
                       "flex-1 py-2 rounded-xl text-sm font-medium border transition-all",
-                      numHarmonics === n
+                      strength === s
                         ? "bg-teal-600 text-white border-teal-600"
                         : "bg-surface-3 text-gray-400 border-surface-border hover:text-white"
                     )}
                   >
-                    {n}
+                    {STRENGTH_PRESETS[s].label}
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-gray-600 mt-1.5">{STRENGTH_PRESETS[strength].description}.</p>
             </div>
           </div>
         )}
@@ -186,7 +191,7 @@ export default function NoiseRemovalPage() {
           <div className="max-w-xl mx-auto glass rounded-2xl p-8 border border-surface-border text-center mb-6">
             <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
             <p className="text-white font-medium mb-1">Filtering audio…</p>
-            <p className="text-gray-500 text-sm">Applying notch filters to remove power line hum.</p>
+            <p className="text-gray-500 text-sm">Applying zero-phase notch filters.</p>
           </div>
         )}
 
