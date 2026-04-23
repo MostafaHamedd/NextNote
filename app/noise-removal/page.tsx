@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { Filter, Download, Zap } from "lucide-react";
 import clsx from "clsx";
 import FileUpload from "@/components/FileUpload";
@@ -12,7 +12,13 @@ import { API_URL } from "@/lib/config";
 type PowerFreq = 50 | 60;
 type Strength = "light" | "standard" | "aggressive";
 
-const STRENGTH_PRESETS: Record<Strength, { num_harmonics: number; quality_factor: number; prop_decrease: number; label: string; description: string }> = {
+const STRENGTH_PRESETS: Record<Strength, {
+  num_harmonics: number;
+  quality_factor: number;
+  prop_decrease: number;
+  label: string;
+  description: string;
+}> = {
   light:      { num_harmonics: 4, quality_factor: 20, prop_decrease: 0.75, label: "Light",      description: "Barely audible hum, gentle filtering" },
   standard:   { num_harmonics: 8, quality_factor: 10, prop_decrease: 0.9,  label: "Standard",   description: "Typical guitar interface hum" },
   aggressive: { num_harmonics: 8, quality_factor: 5,  prop_decrease: 1.0,  label: "Aggressive", description: "Heavy hum from cheap interface or bad cable" },
@@ -40,8 +46,32 @@ export default function NoiseRemovalPage() {
   const [frequency, setFrequency] = useState<PowerFreq>(60);
   const [strength, setStrength] = useState<Strength>("standard");
 
+  // Audio playback URLs
+  const originalUrlRef = useRef<string | null>(null);
+  const cleanedUrlRef  = useRef<string | null>(null);
+  const [originalUrl, setOriginalUrl] = useState<string | null>(null);
+  const [cleanedUrl,  setCleanedUrl]  = useState<string | null>(null);
+
+  // Revoke old object URLs when component unmounts or new file processed
+  const revokeUrls = useCallback(() => {
+    if (originalUrlRef.current) { URL.revokeObjectURL(originalUrlRef.current); originalUrlRef.current = null; }
+    if (cleanedUrlRef.current)  { URL.revokeObjectURL(cleanedUrlRef.current);  cleanedUrlRef.current  = null; }
+    setOriginalUrl(null);
+    setCleanedUrl(null);
+  }, []);
+
+  useEffect(() => () => revokeUrls(), [revokeUrls]);
+
   const handleFile = useCallback(async (file: File) => {
     if (!checkAccess("/noise-removal")) return;
+
+    revokeUrls();
+
+    // Create original audio URL immediately so it's ready when result arrives
+    const origUrl = URL.createObjectURL(file);
+    originalUrlRef.current = origUrl;
+    setOriginalUrl(origUrl);
+
     setIsProcessing(true);
     setResult(null);
     setError(null);
@@ -54,10 +84,10 @@ export default function NoiseRemovalPage() {
       form.append("file", file);
 
       const params = new URLSearchParams({
-        frequency: String(frequency),
+        frequency:     String(frequency),
         num_harmonics: String(preset.num_harmonics),
         quality_factor: String(preset.quality_factor),
-        prop_decrease: String(preset.prop_decrease),
+        prop_decrease:  String(preset.prop_decrease),
       });
 
       const res = await fetch(`${API_URL}/noise-removal/clean?${params}`, {
@@ -72,25 +102,36 @@ export default function NoiseRemovalPage() {
       }
 
       const data: NoiseRemovalResult = await res.json();
+
+      // Build cleaned audio URL from base64
+      const bytes = Uint8Array.from(atob(data.cleaned_audio_b64), (c) => c.charCodeAt(0));
+      const blob  = new Blob([bytes], { type: "audio/mpeg" });
+      const cleanUrl = URL.createObjectURL(blob);
+      cleanedUrlRef.current = cleanUrl;
+      setCleanedUrl(cleanUrl);
+
       setResult(data);
       recordUsage();
     } catch (e: any) {
       setError(e.message || "Processing failed. Is the backend running?");
+      revokeUrls();
     } finally {
       setIsProcessing(false);
     }
-  }, [frequency, strength, checkAccess, recordUsage]);
+  }, [frequency, strength, checkAccess, recordUsage, revokeUrls]);
 
   const downloadCleaned = () => {
-    if (!result) return;
-    const bytes = Uint8Array.from(atob(result.cleaned_audio_b64), (c) => c.charCodeAt(0));
-    const blob = new Blob([bytes], { type: "audio/mpeg" });
-    const url = URL.createObjectURL(blob);
+    if (!cleanedUrl) return;
     const a = document.createElement("a");
-    a.href = url;
+    a.href = cleanedUrl;
     a.download = `${filename}_cleaned.mp3`;
     a.click();
-    URL.revokeObjectURL(url);
+  };
+
+  const handleReset = () => {
+    revokeUrls();
+    setResult(null);
+    setError(null);
   };
 
   return (
@@ -118,8 +159,8 @@ export default function NoiseRemovalPage() {
             Remove power line hum
           </h1>
           <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto leading-relaxed">
-            Upload any audio recording. Zero-phase notch filters strip 50 Hz or 60 Hz
-            electrical hum and up to 8 harmonics, leaving your music intact.
+            Upload any recording. Surgical zero-phase notch filters strip 50/60 Hz
+            electrical hum and harmonics — nothing else is touched.
           </p>
 
           {!free_mode && remaining !== null && remaining > 0 && (
@@ -204,10 +245,7 @@ export default function NoiseRemovalPage() {
             <div>
               <p className="font-semibold text-red-400 mb-1">Processing failed</p>
               <p className="text-red-300/80 text-sm">{error}</p>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-400 text-sm underline mt-2 hover:text-red-300"
-              >
+              <button onClick={() => setError(null)} className="text-red-400 text-sm underline mt-2 hover:text-red-300">
                 Try again
               </button>
             </div>
@@ -219,17 +257,15 @@ export default function NoiseRemovalPage() {
           <>
             <div className="flex items-center justify-between mb-5 max-w-xl mx-auto">
               <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wide">Result</h2>
-              <button
-                onClick={() => { setResult(null); setError(null); }}
-                className="text-xs text-gray-500 hover:text-white transition-colors"
-              >
+              <button onClick={handleReset} className="text-xs text-gray-500 hover:text-white transition-colors">
                 Process another file
               </button>
             </div>
 
-            <div className="max-w-xl mx-auto glass rounded-2xl p-6 border border-teal-500/20 mb-6">
+            <div className="max-w-xl mx-auto glass rounded-2xl p-6 border border-teal-500/20 mb-6 space-y-6">
+
               {/* Stats */}
-              <div className="grid grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="text-center">
                   <p className="text-2xl font-bold text-teal-400">{result.detected_frequency} Hz</p>
                   <p className="text-xs text-gray-500 mt-1">Detected hum</p>
@@ -247,27 +283,53 @@ export default function NoiseRemovalPage() {
                 </div>
               </div>
 
-              {/* Frequencies */}
-              <div className="mb-6">
+              {/* Notched frequencies */}
+              <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Notched frequencies</p>
                 <div className="flex flex-wrap gap-2">
                   {result.harmonics_removed.map((hz) => (
-                    <span
-                      key={hz}
-                      className="px-3 py-1 bg-teal-600/15 border border-teal-500/30 rounded-full text-xs text-teal-300 font-mono"
-                    >
+                    <span key={hz} className="px-3 py-1 bg-teal-600/15 border border-teal-500/30 rounded-full text-xs text-teal-300 font-mono">
                       {hz} Hz
                     </span>
                   ))}
                 </div>
               </div>
 
+              {/* A/B listen */}
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Before / After</p>
+                <div className="space-y-3">
+                  <div>
+                    <p className="text-xs text-gray-400 mb-1.5">Original</p>
+                    {originalUrl && (
+                      <audio
+                        controls
+                        src={originalUrl}
+                        className="w-full rounded-xl"
+                        style={{ height: "36px", accentColor: "#6b7280" }}
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-xs text-teal-400 mb-1.5">Cleaned</p>
+                    {cleanedUrl && (
+                      <audio
+                        controls
+                        src={cleanedUrl}
+                        className="w-full rounded-xl"
+                        style={{ height: "36px", accentColor: "#0d9488" }}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Sample rate */}
-              <p className="text-xs text-gray-600 mb-5">
+              <p className="text-xs text-gray-600">
                 Sample rate: {(result.sample_rate / 1000).toFixed(1)} kHz
               </p>
 
-              {/* Download button */}
+              {/* Download */}
               <button
                 onClick={downloadCleaned}
                 className="w-full flex items-center justify-center gap-2 bg-teal-600 hover:bg-teal-500 text-white font-semibold py-3 rounded-xl transition-colors"
