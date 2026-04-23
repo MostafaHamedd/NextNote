@@ -21,6 +21,7 @@ const STRENGTH_PRESETS: Record<Strength, { num_harmonics: number; quality_factor
 interface NoiseRemovalResult {
   cleaned_audio_b64: string;
   frequency: number;
+  detected_frequency: number;
   harmonics_removed: number[];
   noise_reduction_db: number;
   sample_rate: number;
@@ -230,8 +231,11 @@ export default function NoiseRemovalPage() {
               {/* Stats */}
               <div className="grid grid-cols-3 gap-4 mb-6">
                 <div className="text-center">
-                  <p className="text-2xl font-bold text-teal-400">{result.frequency} Hz</p>
-                  <p className="text-xs text-gray-500 mt-1">Fundamental</p>
+                  <p className="text-2xl font-bold text-teal-400">{result.detected_frequency} Hz</p>
+                  <p className="text-xs text-gray-500 mt-1">Detected hum</p>
+                  {result.detected_frequency !== result.frequency && (
+                    <p className="text-[10px] text-gray-600 mt-0.5">(expected {result.frequency} Hz)</p>
+                  )}
                 </div>
                 <div className="text-center">
                   <p className="text-2xl font-bold text-white">{result.harmonics_removed.length}</p>
