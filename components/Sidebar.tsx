@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Clock, Crown, LogIn, Zap, Library, Wand2, PlusCircle, Music, Radio, Headphones, Filter } from "lucide-react";
+import { LogIn, Zap, Library, Wand2, Radio, Headphones, Filter, Crown, LayoutGrid, PenLine } from "lucide-react";
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import HistorySidebar from "@/components/HistorySidebar";
@@ -14,11 +14,21 @@ import { authHeaders, MAX_FREE_ATTEMPTS } from "@/lib/auth";
 import { API_URL } from "@/lib/config";
 import UserMenu from "@/components/UserMenu";
 
+const TOOLS = [
+  { href: "/analyze",        label: "Guitar → Piano",   icon: PenLine,   activeOn: ["/analyze", "/results"], flagKey: "guitar_piano_enabled"  },
+  { href: "/visualizer",     label: "Piano Visualizer", icon: LayoutGrid, activeOn: ["/visualizer", "/visualizer/play"], flagKey: "visualizer_enabled" },
+  { href: "/producer",       label: "Producer",         icon: Wand2,     activeOn: ["/producer"],             flagKey: "producer_enabled"      },
+  { href: "/live",           label: "Live Detector",    icon: Radio,     activeOn: ["/live"],                 flagKey: "live_detector_enabled" },
+  { href: "/ear-training",   label: "Ear Training",     icon: Headphones, activeOn: ["/ear-training"],       flagKey: "ear_training_enabled"  },
+  { href: "/noise-removal",  label: "Noise Removal",    icon: Filter,    activeOn: ["/noise-removal"],        flagKey: "noise_removal_enabled" },
+] as const;
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const { user } = useAuth();
-  const { free_mode, producer_enabled } = usePlatform();
+  const platform = usePlatform();
+  const { free_mode } = platform;
   const [showHistory, setShowHistory] = useState(false);
   const [freeUsed, setFreeUsed] = useState(0);
   const { sessions, deleteSession, clearAll } = useSessionHistory();
@@ -48,6 +58,8 @@ export default function Sidebar() {
     router.push("/results");
   };
 
+  const isLibraryActive = pathname === "/library";
+
   return (
     <>
       <aside className="hidden md:flex fixed top-0 left-0 h-full w-44 bg-surface-1 border-r border-surface-border flex-col z-40">
@@ -60,237 +72,71 @@ export default function Sidebar() {
           <div className="w-7 h-7 bg-brand-600 rounded-lg flex items-center justify-center shrink-0">
             <Zap size={13} className="text-white" />
           </div>
-          <span className="font-bold text-white text-sm tracking-tight">NextNote</span>
+          <div>
+            <p className="font-bold text-white text-sm tracking-tight leading-none">NextNote</p>
+            <p className="text-[10px] text-gray-500 leading-none mt-0.5">Music AI</p>
+          </div>
         </Link>
 
-        {/* Nav items */}
+        {/* Nav */}
         <nav className="flex-1 py-3 px-2 space-y-0.5 overflow-y-auto">
-          {user ? (
-            <>
-              {/* Logged-in order: Library + sub-links, then tools */}
+          {/* My Library */}
+          <Link
+            href="/library"
+            className={clsx(
+              "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
+              isLibraryActive
+                ? "bg-brand-600/20 text-white"
+                : "text-gray-400 hover:text-white hover:bg-surface-3"
+            )}
+          >
+            <Library size={15} />
+            My Library
+          </Link>
+
+          {/* TOOLS section */}
+          <div className="pt-4 pb-1.5 px-3">
+            <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Tools</p>
+          </div>
+
+          {TOOLS.map(({ href, label, icon: Icon, activeOn, flagKey }) => {
+            if (!platform[flagKey]) return null;
+            const isActive = (activeOn as readonly string[]).includes(pathname);
+            return (
               <Link
-                href="/library"
+                key={href}
+                href={href}
                 className={clsx(
                   "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                  pathname === "/library"
-                    ? "bg-brand-600 text-white"
+                  isActive
+                    ? "bg-brand-600/20 text-white"
                     : "text-gray-400 hover:text-white hover:bg-surface-3"
                 )}
               >
-                <Library size={15} />
-                Library
+                <Icon size={14} />
+                {label}
               </Link>
+            );
+          })}
 
-              {/* Sub-links under Library */}
-              <div className="pl-3 space-y-0.5">
-                <Link
-                  href="/analyze"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/analyze" || pathname === "/results"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <PlusCircle size={12} />
-                  Guitar → Piano
-                </Link>
-                <Link
-                  href="/visualizer"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/visualizer" || pathname === "/visualizer/play"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <Music size={12} />
-                  Piano visualizer
-                </Link>
-                {producer_enabled ? (
-                  <Link
-                    href="/producer"
-                    className={clsx(
-                      "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                      pathname === "/producer"
-                        ? "text-brand-400 border-brand-500/50"
-                        : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                    )}
-                  >
-                    <Wand2 size={12} />
-                    Producer
-                  </Link>
-                ) : (
-                  <span className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium border-l border-surface-border ml-1 text-gray-700 cursor-not-allowed">
-                    <Wand2 size={12} />
-                    Producer
-                  </span>
-                )}
-                <Link
-                  href="/live"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/live"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <Radio size={12} />
-                  Live Detector
-                </Link>
-                <Link
-                  href="/ear-training"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/ear-training"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <Headphones size={12} />
-                  Ear Training
-                </Link>
-                <Link
-                  href="/noise-removal"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/noise-removal"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <Filter size={12} />
-                  Noise Removal
-                </Link>
-              </div>
-
-              {!free_mode && (
-                <Link
-                  href="/pricing"
-                  className={clsx(
-                    "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                    pathname === "/pricing"
-                      ? "bg-brand-600 text-white"
-                      : "text-gray-400 hover:text-white hover:bg-surface-3"
-                  )}
-                >
-                  <Crown size={15} />
-                  Pricing
-                </Link>
-              )}
-            </>
-          ) : (
+          {/* ACCOUNT section */}
+          {!free_mode && (
             <>
-              {/* Anonymous: same nav as logged-in — all features available */}
+              <div className="pt-4 pb-1.5 px-3">
+                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Account</p>
+              </div>
               <Link
-                href="/library"
+                href="/pricing"
                 className={clsx(
                   "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                  pathname === "/library"
-                    ? "bg-brand-600 text-white"
+                  pathname === "/pricing"
+                    ? "bg-brand-600/20 text-white"
                     : "text-gray-400 hover:text-white hover:bg-surface-3"
                 )}
               >
-                <Library size={15} />
-                Library
+                <Crown size={14} />
+                Upgrade
               </Link>
-
-              <div className="pl-3 space-y-0.5">
-                <Link
-                  href="/analyze"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/analyze" || pathname === "/results"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <PlusCircle size={12} />
-                  Guitar → Piano
-                </Link>
-                <Link
-                  href="/visualizer"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/visualizer" || pathname === "/visualizer/play"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <Music size={12} />
-                  Piano visualizer
-                </Link>
-                {producer_enabled ? (
-                  <Link
-                    href="/producer"
-                    className={clsx(
-                      "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                      pathname === "/producer"
-                        ? "text-brand-400 border-brand-500/50"
-                        : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                    )}
-                  >
-                    <Wand2 size={12} />
-                    Producer
-                  </Link>
-                ) : (
-                  <span className="flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium border-l border-surface-border ml-1 text-gray-700 cursor-not-allowed">
-                    <Wand2 size={12} />
-                    Producer
-                  </span>
-                )}
-                <Link
-                  href="/live"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/live"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <Radio size={12} />
-                  Live Detector
-                </Link>
-                <Link
-                  href="/ear-training"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/ear-training"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <Headphones size={12} />
-                  Ear Training
-                </Link>
-                <Link
-                  href="/noise-removal"
-                  className={clsx(
-                    "flex items-center gap-2 w-full px-3 py-1.5 rounded-lg text-xs font-medium transition-all border-l border-surface-border ml-1",
-                    pathname === "/noise-removal"
-                      ? "text-brand-400 border-brand-500/50"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-surface-3"
-                  )}
-                >
-                  <Filter size={12} />
-                  Noise Removal
-                </Link>
-              </div>
-
-              {!free_mode && (
-                <Link
-                  href="/pricing"
-                  className={clsx(
-                    "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
-                    pathname === "/pricing"
-                      ? "bg-brand-600 text-white"
-                      : "text-gray-400 hover:text-white hover:bg-surface-3"
-                  )}
-                >
-                  <Crown size={15} />
-                  Pricing
-                </Link>
-              )}
             </>
           )}
         </nav>
@@ -300,7 +146,6 @@ export default function Sidebar() {
           <UserMenu />
         ) : (
           <div className="px-2 py-3 border-t border-surface-border shrink-0 space-y-1">
-            {/* Free attempt progress */}
             {!free_mode && freeUsed < MAX_FREE_ATTEMPTS && (
               <div className="px-3 py-2">
                 <div className="flex justify-between text-[10px] text-gray-500 mb-1">

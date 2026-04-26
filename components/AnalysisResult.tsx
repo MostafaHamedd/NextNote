@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import {
   Music, Zap, Lightbulb, Star, ArrowRight,
-  Sparkles, Tag, Loader2, Download, ChevronDown,
+  Sparkles, Tag, Loader2,
 } from "lucide-react";
 import clsx from "clsx";
 import PianoView, { ChordData } from "@/components/PianoView";
@@ -73,11 +73,22 @@ function moodColor(tag: string) {
   return MOOD_COLORS.default;
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// Stat card with colored top border accent
+const STAT_BORDERS = [
+  "border-t-brand-500",
+  "border-t-blue-500",
+  "border-t-cyan-500",
+  "border-t-amber-500",
+];
 
-function StatCard({ label, value, sub }: { label: string; value: string; sub?: string }) {
+function StatCard({ label, value, sub, borderColor }: {
+  label: string;
+  value: string;
+  sub?: string;
+  borderColor: string;
+}) {
   return (
-    <div className="bg-surface-2 rounded-xl p-4 border border-surface-border">
+    <div className={clsx("bg-surface-2 rounded-xl p-4 border border-surface-border border-t-2", borderColor)}>
       <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">{label}</p>
       <p className="text-2xl font-bold text-white leading-none">{value}</p>
       {sub && <p className="text-xs text-gray-500 mt-0.5 capitalize">{sub}</p>}
@@ -123,9 +134,6 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
   const [scaleError, setScaleError] = useState<string | null>(null);
 
   const [activeTab, setActiveTab] = useState<"piano" | "scales">("piano");
-  const [midiDownloading, setMidiDownloading] = useState<"standard" | "full" | "timed" | null>(null);
-  const [exportOpen, setExportOpen] = useState(false);
-  const exportRef = useRef<HTMLDivElement>(null);
 
   // Auto-fetch piano + scale on mount
   useEffect(() => {
@@ -167,177 +175,23 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
     return () => { cancelled = true; };
   }, [analysis]);
 
-  // Close export dropdown on outside click
-  useEffect(() => {
-    if (!exportOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (!exportRef.current?.contains(e.target as Node)) setExportOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [exportOpen]);
-
   const fmt = (s: number) =>
     s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${Math.round(s % 60)}s`;
 
   const [styleMain, styleSub] = analysis.playing_style.split("/");
-
-  const handleDownloadMidi = useCallback(async (
-    doubleOctave: boolean,
-    timed: boolean = false,
-  ) => {
-    const key = timed ? "timed" : doubleOctave ? "full" : "standard";
-    setMidiDownloading(key);
-    try {
-      const body: Record<string, unknown> = {
-        chord_sequence: analysis.chord_sequence ?? analysis.chords,
-        bpm: analysis.bpm,
-        double_octave: doubleOctave,
-        duration_seconds: analysis.duration_seconds,
-      };
-      if (timed && analysis.chord_timeline?.length) {
-        body.chord_timeline = analysis.chord_timeline;
-      }
-      const res = await fetch(`${API_URL}/piano-midi`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) throw new Error();
-      const { midi_b64 } = await res.json();
-      const binary = atob(midi_b64);
-      const bytes = new Uint8Array(binary.length);
-      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-      const suffix = timed ? "_timed" : doubleOctave ? "_full" : "";
-      const url = URL.createObjectURL(new Blob([bytes], { type: "audio/midi" }));
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${analysis.key}_${analysis.mode}_${analysis.bpm}bpm_piano${suffix}.mid`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch {
-      // silently ignore
-    } finally {
-      setMidiDownloading(null);
-    }
-  }, [analysis]);
 
   return (
     <div className="space-y-4">
 
       {/* ── Row 1: Stats ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <StatCard label="Key"      value={analysis.key}   sub={analysis.mode} />
-        <StatCard label="Tempo"    value={`${analysis.bpm}`} sub="BPM" />
-        <StatCard label="Duration" value={fmt(analysis.duration_seconds)} />
-        <StatCard label="Style"    value={styleMain}      sub={styleSub} />
+        <StatCard label="Key"      value={analysis.key}             sub={analysis.mode}  borderColor={STAT_BORDERS[0]} />
+        <StatCard label="Tempo"    value={`${analysis.bpm}`}        sub="BPM"            borderColor={STAT_BORDERS[1]} />
+        <StatCard label="Duration" value={fmt(analysis.duration_seconds)}                borderColor={STAT_BORDERS[2]} />
+        <StatCard label="Style"    value={styleMain}                sub={styleSub}       borderColor={STAT_BORDERS[3]} />
       </div>
 
-      {/* ── Row 2: Tab nav + Export ── */}
-      <div className="bg-surface-2 border border-surface-border rounded-2xl px-4 py-2 flex items-center gap-1">
-        <button
-          onClick={() => setActiveTab("piano")}
-          className={clsx(
-            "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
-            activeTab === "piano"
-              ? "bg-brand-600/20 text-brand-300 border border-brand-500/40"
-              : "text-gray-400 hover:text-gray-200 border border-transparent"
-          )}
-        >
-          {pianoLoading && activeTab !== "piano" ? <Loader2 size={13} className="animate-spin" /> : null}
-          Piano
-          {pianoLoading && <Loader2 size={13} className="animate-spin ml-1" />}
-        </button>
-        <button
-          onClick={() => setActiveTab("scales")}
-          className={clsx(
-            "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
-            activeTab === "scales"
-              ? "bg-amber-600/15 text-amber-300 border border-amber-500/35"
-              : "text-gray-400 hover:text-gray-200 border border-transparent"
-          )}
-        >
-          Scales
-          {scaleLoading && <Loader2 size={13} className="animate-spin ml-1" />}
-        </button>
-
-        <div ref={exportRef} className="relative ml-auto">
-          <button
-            onClick={() => setExportOpen((v) => !v)}
-            disabled={midiDownloading !== null}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium bg-brand-600 hover:bg-brand-500 text-white transition-colors disabled:opacity-60"
-          >
-            {midiDownloading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-            {midiDownloading ? "Generating…" : "Export"}
-            {!midiDownloading && <ChevronDown size={13} className={clsx("transition-transform", exportOpen && "rotate-180")} />}
-          </button>
-
-          {exportOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-56 bg-surface-2 border border-surface-border rounded-xl shadow-xl z-20 overflow-hidden">
-              <button
-                onClick={() => { setExportOpen(false); handleDownloadMidi(false); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
-              >
-                <Download size={13} className="text-brand-400 shrink-0" />
-                MIDI — Standard
-              </button>
-              <div className="mx-3 border-t border-surface-border" />
-              <button
-                onClick={() => { setExportOpen(false); handleDownloadMidi(true); }}
-                className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
-              >
-                <Download size={13} className="text-brand-400 shrink-0" />
-                MIDI — Full Octave
-              </button>
-              {/* TODO: Match Lengths — timing accuracy needs work before shipping
-              {analysis.chord_timeline?.length && (
-                <>
-                  <div className="mx-3 border-t border-surface-border" />
-                  <button
-                    onClick={() => { setExportOpen(false); handleDownloadMidi(false, true); }}
-                    className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-300 hover:bg-surface-3 hover:text-white transition-colors"
-                  >
-                    <Download size={13} className="text-amber-400 shrink-0" />
-                    <span>
-                      MIDI — Match Lengths
-                      <span className="block text-[10px] text-gray-500">Chord durations from audio</span>
-                    </span>
-                  </button>
-                </>
-              )}
-              */}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ── Row 3: Active panel ── */}
-      {activeTab === "piano" && (
-        <>
-          {pianoLoading && (
-            <div className="bg-surface-2 border border-surface-border rounded-2xl p-6 flex items-center gap-3 text-gray-500 text-sm">
-              <Loader2 size={15} className="animate-spin shrink-0" />Loading piano view…
-            </div>
-          )}
-          {pianoError && <p className="text-xs text-red-400 px-1">{pianoError}</p>}
-          {pianoData && <PianoView chordData={pianoData} bpm={analysis.bpm} />}
-        </>
-      )}
-      {activeTab === "scales" && (
-        <>
-          {scaleLoading && (
-            <div className="bg-surface-2 border border-surface-border rounded-2xl p-6 flex items-center gap-3 text-gray-500 text-sm">
-              <Loader2 size={15} className="animate-spin shrink-0" />Loading scale suggestions…
-            </div>
-          )}
-          {scaleError && <p className="text-xs text-red-400 px-1">{scaleError}</p>}
-          {scaleData && <ScaleView data={scaleData} />}
-        </>
-      )}
-
-      {/* ── Row 4: Sonic | Chords (enlarged) | Feedback ── */}
+      {/* ── Row 2: Sonic Feel | Chord Progression | Feedback ── */}
       <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[200px_1fr_220px] lg:gap-4 lg:items-start">
 
         {/* Left: Sonic Feel */}
@@ -369,7 +223,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           </Card>
         </div>
 
-        {/* Center: Chord Progression — enlarged */}
+        {/* Center: Chord Progression */}
         <div className="w-full min-w-0 lg:self-start">
           <div className="bg-surface-2 rounded-2xl p-6 border border-surface-border">
             <div className="flex items-center gap-2.5 mb-5">
@@ -406,7 +260,7 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
               <Zap size={16} className="text-white" />
             </div>
             <div>
-              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Current Stage</p>
+              <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-widest mb-1">Stage</p>
               <p className={clsx("text-sm font-semibold", feedback.current_stage === FEEDBACK_PENDING ? "text-gray-500 italic" : "text-gray-200")}>
                 {feedback.current_stage}
               </p>
@@ -456,6 +310,58 @@ export default function AnalysisResult({ analysis, feedback }: Props) {
           </div>
         </div>
       </div>
+
+      {/* ── Piano / Scales tabs ── */}
+      <div className="bg-surface-2 border border-surface-border rounded-2xl px-4 py-2 flex items-center gap-1">
+        <button
+          onClick={() => setActiveTab("piano")}
+          className={clsx(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
+            activeTab === "piano"
+              ? "bg-brand-600/20 text-brand-300 border border-brand-500/40"
+              : "text-gray-400 hover:text-gray-200 border border-transparent"
+          )}
+        >
+          Piano
+          {pianoLoading && <Loader2 size={13} className="animate-spin ml-1" />}
+        </button>
+        <button
+          onClick={() => setActiveTab("scales")}
+          className={clsx(
+            "flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all",
+            activeTab === "scales"
+              ? "bg-amber-600/15 text-amber-300 border border-amber-500/35"
+              : "text-gray-400 hover:text-gray-200 border border-transparent"
+          )}
+        >
+          Scales
+          {scaleLoading && <Loader2 size={13} className="animate-spin ml-1" />}
+        </button>
+      </div>
+
+      {/* ── Piano / Scales content ── */}
+      {activeTab === "piano" && (
+        <>
+          {pianoLoading && (
+            <div className="bg-surface-2 border border-surface-border rounded-2xl p-6 flex items-center gap-3 text-gray-500 text-sm">
+              <Loader2 size={15} className="animate-spin shrink-0" />Loading piano view…
+            </div>
+          )}
+          {pianoError && <p className="text-xs text-red-400 px-1">{pianoError}</p>}
+          {pianoData && <PianoView chordData={pianoData} bpm={analysis.bpm} />}
+        </>
+      )}
+      {activeTab === "scales" && (
+        <>
+          {scaleLoading && (
+            <div className="bg-surface-2 border border-surface-border rounded-2xl p-6 flex items-center gap-3 text-gray-500 text-sm">
+              <Loader2 size={15} className="animate-spin shrink-0" />Loading scale suggestions…
+            </div>
+          )}
+          {scaleError && <p className="text-xs text-red-400 px-1">{scaleError}</p>}
+          {scaleData && <ScaleView data={scaleData} />}
+        </>
+      )}
 
       {/* ── Genre / Mood / Why ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">

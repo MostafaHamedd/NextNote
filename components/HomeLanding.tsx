@@ -1,128 +1,231 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Zap, Guitar, Piano, ArrowRight, Library, Wand2, Filter } from "lucide-react";
+import { Sparkles, PenLine, LayoutGrid, Wand2, Radio, Headphones, Filter } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { usePlatform } from "@/context/PlatformContext";
+import { useSessionHistory } from "@/hooks/useSessionHistory";
+import { authHeaders } from "@/lib/auth";
+import { API_URL } from "@/lib/config";
+
+interface DisplaySession {
+  id: string | number;
+  label: string;
+  key: string;
+  mode: string;
+  bpm: number;
+  timestamp: number;
+  isServer?: boolean;
+}
+
+function formatDate(timestamp: number) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const yesterday = new Date();
+  yesterday.setDate(today.getDate() - 1);
+  if (date.toDateString() === today.toDateString()) return "Today";
+  if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+  return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+const TOOLS = [
+  {
+    href: "/analyze",
+    label: "Guitar → Piano",
+    desc: "Detect chords, key & tempo from recordings. Export MIDI for Logic Pro.",
+    icon: PenLine,
+    topBorder: "border-t-brand-500",
+    iconBg: "bg-brand-600/20",
+    iconColor: "text-brand-400",
+    linkColor: "text-brand-400",
+    flagKey: "guitar_piano_enabled" as const,
+  },
+  {
+    href: "/visualizer",
+    label: "Piano Visualizer",
+    desc: "Watch MIDI & songs play out on an animated piano keyboard.",
+    icon: LayoutGrid,
+    topBorder: "border-t-cyan-500",
+    iconBg: "bg-cyan-600/20",
+    iconColor: "text-cyan-400",
+    linkColor: "text-cyan-400",
+    flagKey: "visualizer_enabled" as const,
+  },
+  {
+    href: "/producer",
+    label: "Producer Intelligence",
+    desc: "Extract melody MIDI from any audio. Full producer feedback on your music.",
+    icon: Wand2,
+    topBorder: "border-t-purple-500",
+    iconBg: "bg-purple-600/20",
+    iconColor: "text-purple-400",
+    linkColor: "text-purple-400",
+    flagKey: "producer_enabled" as const,
+  },
+  {
+    href: "/live",
+    label: "Live Detector",
+    desc: "Real-time chord and note detection from your microphone.",
+    icon: Radio,
+    topBorder: "border-t-amber-500",
+    iconBg: "bg-amber-600/20",
+    iconColor: "text-amber-400",
+    linkColor: "text-amber-400",
+    flagKey: "live_detector_enabled" as const,
+  },
+  {
+    href: "/ear-training",
+    label: "Ear Training",
+    desc: "Train your ear to identify chords, intervals and scales.",
+    icon: Headphones,
+    topBorder: "border-t-teal-500",
+    iconBg: "bg-teal-600/20",
+    iconColor: "text-teal-400",
+    linkColor: "text-teal-400",
+    flagKey: "ear_training_enabled" as const,
+  },
+  {
+    href: "/noise-removal",
+    label: "Noise Removal",
+    desc: "Strip 50/60 Hz power line hum and noise from any recording.",
+    icon: Filter,
+    topBorder: "border-t-green-500",
+    iconBg: "bg-green-600/20",
+    iconColor: "text-green-400",
+    linkColor: "text-green-400",
+    flagKey: "noise_removal_enabled" as const,
+  },
+];
 
 export default function HomeLanding() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
+  const platform = usePlatform();
+  const { sessions: localSessions } = useSessionHistory();
+  const [serverSessions, setServerSessions] = useState<DisplaySession[]>([]);
+
+  // Fetch recent sessions from server for logged-in users
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_URL}/sessions/guitar`, { headers: { Authorization: `Bearer ${token}` } })
+      .then((r) => r.ok ? r.json() : [])
+      .then((data: any[]) => {
+        if (!Array.isArray(data)) return;
+        setServerSessions(
+          data.slice(0, 4).map((s) => ({
+            id: s.id,
+            label: s.label,
+            key: s.key ?? "",
+            mode: s.mode ?? "",
+            bpm: s.bpm ?? 0,
+            timestamp: new Date(s.created_at).getTime(),
+            isServer: true,
+          }))
+        );
+      })
+      .catch(() => {});
+  }, [token]);
+
+  const displaySessions: DisplaySession[] = user
+    ? serverSessions
+    : localSessions.slice(0, 4).map((s) => ({
+        id: s.id,
+        label: s.label,
+        key: s.key,
+        mode: s.mode,
+        bpm: s.bpm,
+        timestamp: s.timestamp,
+      }));
 
   return (
-    <div className="min-h-screen bg-surface relative overflow-hidden flex flex-col">
-      <div
-        className="absolute inset-0 pointer-events-none"
-        style={{
-          backgroundImage:
-            "linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
-        }}
-      />
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[min(90vw,36rem)] h-[min(90vw,36rem)] bg-brand-600/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-accent-purple/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-surface">
+      <div className="max-w-5xl mx-auto px-6 py-10">
 
-      <main className="relative z-10 flex-1 flex flex-col items-center justify-center px-4 py-16 sm:py-24 max-w-lg mx-auto w-full text-center">
-        <div className="inline-flex items-center gap-2 bg-brand-500/10 border border-brand-500/20 rounded-full px-4 py-1.5 mb-8">
-          <Zap size={14} className="text-brand-400" />
-          <span className="text-sm font-medium text-brand-300">NextNote</span>
+        {/* Badge */}
+        <div className="inline-flex items-center gap-2 border border-teal-500/40 bg-teal-500/5 rounded-full px-3.5 py-1.5 mb-6">
+          <Sparkles size={13} className="text-teal-400" />
+          <span className="text-sm font-medium text-teal-300">AI-powered music tools</span>
         </div>
 
-        <h1 className="text-4xl sm:text-5xl font-bold text-white tracking-tight mb-4">
+        {/* Hero */}
+        <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">
           Practice smarter.
         </h1>
-        <p className="text-gray-400 text-base sm:text-lg leading-relaxed mb-12 max-w-sm">
-          Turn guitar recordings into chords, keys, and a playable piano view—then export MIDI for Logic Pro or any DAW. Piano visualizer for MIDI and songs, too.
+        <h2 className="text-4xl sm:text-5xl font-extrabold text-brand-400 tracking-tight leading-tight mb-4">
+          Create faster.
+        </h2>
+        <p className="text-gray-400 text-base max-w-lg mb-10 leading-relaxed">
+          Turn guitar recordings into chords, keys, and playable piano views — then export MIDI straight to your DAW.
         </p>
 
-        <div className="w-full space-y-3 sm:space-y-4">
-          {/* Library card — only for logged-in users */}
-          {user && (
-            <Link
-              href="/library"
-              className="group flex items-center gap-4 w-full glass rounded-2xl border border-brand-500/30 p-4 sm:p-5 text-left transition-all hover:border-brand-400/50 hover:bg-brand-500/5"
-            >
-              <div className="p-3 rounded-xl bg-brand-600/20 text-brand-400 shrink-0">
-                <Library size={22} strokeWidth={1.75} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-semibold text-white text-sm sm:text-base">My Library</p>
-                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Your saved sessions and account overview</p>
-              </div>
-              <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
-            </Link>
-          )}
+        {/* Recent Sessions */}
+        {displaySessions.length > 0 && (
+          <section className="mb-10">
+            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">
+              Recent Sessions
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {displaySessions.map((session) => (
+                <Link
+                  key={session.id}
+                  href={
+                    session.isServer
+                      ? `/results?session=${session.id}`
+                      : `/results?session=${session.id}`
+                  }
+                  className="bg-surface-2 rounded-xl p-4 border border-surface-border hover:border-brand-500/40 transition-all"
+                >
+                  <p className="text-xs text-gray-500 mb-1.5">{formatDate(session.timestamp)}</p>
+                  <p className="text-sm font-semibold text-white truncate mb-3">{session.label}</p>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {session.key && (
+                      <span className="text-[11px] font-mono bg-surface-3 border border-surface-border text-gray-300 rounded-md px-1.5 py-0.5">
+                        {session.key} {session.mode}
+                      </span>
+                    )}
+                    {session.bpm > 0 && (
+                      <span className="text-[11px] font-mono bg-surface-3 border border-surface-border text-gray-300 rounded-md px-1.5 py-0.5">
+                        {session.bpm} bpm
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </section>
+        )}
 
-          <Link
-            href="/analyze"
-            className="group flex items-center gap-4 w-full glass rounded-2xl border border-surface-border p-4 sm:p-5 text-left transition-all hover:border-brand-500/40 hover:bg-brand-500/5"
-          >
-            <div className="p-3 rounded-xl bg-brand-600/20 text-brand-400 shrink-0">
-              <Guitar size={22} strokeWidth={1.75} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-sm sm:text-base">Guitar → Piano</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
-                Chords, tempo &amp; key—export chord MIDI for your DAW
-              </p>
-            </div>
-            <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
-          </Link>
+        {/* All Tools */}
+        <section>
+          <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest mb-4">
+            All Tools
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {TOOLS.map(({ href, label, desc, icon: Icon, topBorder, iconBg, iconColor, linkColor, flagKey }) => {
+              if (!platform[flagKey]) return null;
+              return (
+                <div
+                  key={href}
+                  className={`bg-surface-2 rounded-2xl p-5 border border-surface-border border-t-2 ${topBorder} hover:bg-surface-3/30 transition-all flex flex-col`}
+                >
+                  <div className={`w-9 h-9 rounded-xl ${iconBg} flex items-center justify-center mb-4 shrink-0`}>
+                    <Icon size={17} className={iconColor} />
+                  </div>
+                  <p className="font-semibold text-white text-sm mb-1.5">{label}</p>
+                  <p className="text-xs text-gray-500 leading-relaxed mb-4 flex-1">{desc}</p>
+                  <Link
+                    href={href}
+                    className={`text-sm font-medium ${linkColor} hover:opacity-80 transition-opacity`}
+                  >
+                    Open →
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
-          <Link
-            href="/visualizer"
-            className="group flex items-center gap-4 w-full glass rounded-2xl border border-surface-border p-4 sm:p-5 text-left transition-all hover:border-brand-500/40 hover:bg-brand-500/5"
-          >
-            <div className="p-3 rounded-xl bg-cyan-600/15 text-cyan-400 shrink-0">
-              <Piano size={22} strokeWidth={1.75} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-sm sm:text-base">Piano visualizer</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">MIDI &amp; songs with a lit keyboard</p>
-            </div>
-            <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
-          </Link>
-
-          <Link
-            href="/producer"
-            className="group flex items-center gap-4 w-full glass rounded-2xl border border-surface-border p-4 sm:p-5 text-left transition-all hover:border-brand-500/40 hover:bg-brand-500/5"
-          >
-            <div className="p-3 rounded-xl bg-purple-600/15 text-purple-400 shrink-0">
-              <Wand2 size={22} strokeWidth={1.75} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-sm sm:text-base">Producer Intelligence</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Melody MIDI export for Logic Pro from any audio</p>
-            </div>
-            <ArrowRight size={18} className="text-gray-600 group-hover:text-brand-400 shrink-0 transition-colors" />
-          </Link>
-
-          <Link
-            href="/noise-removal"
-            className="group flex items-center gap-4 w-full glass rounded-2xl border border-surface-border p-4 sm:p-5 text-left transition-all hover:border-teal-500/40 hover:bg-teal-500/5"
-          >
-            <div className="p-3 rounded-xl bg-teal-600/15 text-teal-400 shrink-0">
-              <Filter size={22} strokeWidth={1.75} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-white text-sm sm:text-base">Noise Removal</p>
-              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Strip 50/60 Hz power line hum from any recording</p>
-            </div>
-            <ArrowRight size={18} className="text-gray-600 group-hover:text-teal-400 shrink-0 transition-colors" />
-          </Link>
-
-          {!user && (
-            <Link
-              href="/login?next=/library"
-              className="text-sm text-gray-600 hover:text-brand-400 transition-colors pt-2 block"
-            >
-              Sign in to save your sessions →
-            </Link>
-          )}
-        </div>
-      </main>
-
-      <footer className="relative z-10 pb-8 pt-4 text-center text-xs text-gray-600">
-        NextNote
-      </footer>
+      </div>
     </div>
   );
 }
