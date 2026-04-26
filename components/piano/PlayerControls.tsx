@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback, useEffect } from "react";
+import { useRef, useState, useCallback } from "react";
 import { Play, Pause, RotateCcw, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { SPEEDS, Speed } from "@/hooks/usePianoPlayback";
@@ -37,8 +37,9 @@ export default function PlayerControls({
   speed, sustainOn, hasSustain,
   onPlay, onReset, onSeek, onSeekTo, onSpeedChange, onSustainToggle,
 }: Props) {
-  const barRef        = useRef<HTMLDivElement>(null);
-  const draggingRef   = useRef(false);
+  const barRef          = useRef<HTMLDivElement>(null);
+  const draggingRef     = useRef(false);
+  const [isDragging, setIsDragging] = useState(false);
   const [dragFrac, setDragFrac]     = useState<number | null>(null);
   const [hoverFrac, setHoverFrac]   = useState<number | null>(null);
 
@@ -51,14 +52,20 @@ export default function PlayerControls({
 
   // ── Pointer drag (works for mouse + touch) ───────────────────────────────
   const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
     e.currentTarget.setPointerCapture(e.pointerId);
     draggingRef.current = true;
+    setIsDragging(true);
     const frac = fracFromClientX(e.clientX);
     if (frac !== null) { setDragFrac(frac); onSeekTo(frac); }
   }, [fracFromClientX, onSeekTo]);
 
   const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
+    if (!draggingRef.current) {
+      // Update hover tooltip on desktop
+      setHoverFrac(fracFromClientX(e.clientX));
+      return;
+    }
     const frac = fracFromClientX(e.clientX);
     if (frac !== null) { setDragFrac(frac); onSeekTo(frac); }
   }, [fracFromClientX, onSeekTo]);
@@ -66,6 +73,7 @@ export default function PlayerControls({
   const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     if (!draggingRef.current) return;
     draggingRef.current = false;
+    setIsDragging(false);
     const frac = fracFromClientX(e.clientX);
     if (frac !== null) onSeekTo(frac);
     setDragFrac(null);
@@ -162,19 +170,15 @@ export default function PlayerControls({
         {fmt(displayFrac * totalSec)}
       </span>
 
-      {/* Scrubber track */}
+      {/* Scrubber track — tall hit area, pointer-capture drag, no onPointerLeave cancel */}
       <div
         ref={barRef}
-        className="group flex-1 relative flex items-center min-w-0 cursor-pointer touch-none select-none py-2"
+        className="flex-1 relative flex items-center min-w-0 cursor-pointer touch-none select-none py-3"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerLeave={onPointerUp}
-        onMouseMove={e => {
-          const frac = fracFromClientX(e.clientX);
-          if (!draggingRef.current && frac !== null) setHoverFrac(frac);
-        }}
-        onMouseLeave={() => setHoverFrac(null)}
+        onPointerCancel={onPointerUp}
+        onMouseLeave={() => { if (!draggingRef.current) setHoverFrac(null); }}
         onKeyDown={onKeyDown}
         role="slider"
         tabIndex={0}
@@ -190,17 +194,17 @@ export default function PlayerControls({
             className="absolute left-0 top-0 h-full bg-brand-500 rounded-full"
             style={{ width: `${displayFrac * 100}%` }}
           />
-          {/* Thumb */}
+          {/* Thumb — always visible, scales up while dragging */}
           <div
             className={clsx(
-              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 border-brand-500 transition-transform duration-100",
-              draggingRef.current ? "scale-125" : "scale-0 group-hover:scale-100",
+              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow-md border-2 border-brand-500 transition-transform duration-100",
+              isDragging ? "w-4 h-4 scale-125" : "w-3.5 h-3.5 scale-100",
             )}
             style={{ left: `${displayFrac * 100}%` }}
           />
         </div>
 
-        {/* Hover / drag time tooltip */}
+        {/* Time tooltip while hovering or dragging */}
         {(hoverFrac !== null || dragFrac !== null) && (
           <div
             className="absolute -top-7 pointer-events-none z-50"
