@@ -164,6 +164,7 @@ export default function SynthesiaView({ data }: { data: SheetData }) {
           onPlay={playback.handlePlay}
           onReset={playback.handleReset}
           onSeek={playback.handleSeek}
+          onSeekTo={playback.handleSeekTo}
           onSpeedChange={playback.setSpeed}
           onSustainToggle={() => playback.setSustainOn(v => !v)}
         />

@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef, useState, useCallback, useEffect } from "react";
 import { Play, Pause, RotateCcw, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { SPEEDS, Speed } from "@/hooks/usePianoPlayback";
@@ -16,6 +17,7 @@ interface Props {
   onPlay:       () => void;
   onReset:      () => void;
   onSeek:       (e: React.MouseEvent<HTMLDivElement>) => void;
+  onSeekTo:     (frac: number) => void;
   onSpeedChange:(s: Speed) => void;
   onSustainToggle: () => void;
 }
@@ -33,8 +35,49 @@ const chevronBg =
 export default function PlayerControls({
   playing, samplerReady, progress, totalSec,
   speed, sustainOn, hasSustain,
-  onPlay, onReset, onSeek, onSpeedChange, onSustainToggle,
+  onPlay, onReset, onSeek, onSeekTo, onSpeedChange, onSustainToggle,
 }: Props) {
+  const barRef        = useRef<HTMLDivElement>(null);
+  const draggingRef   = useRef(false);
+  const [dragFrac, setDragFrac]     = useState<number | null>(null);
+  const [hoverFrac, setHoverFrac]   = useState<number | null>(null);
+
+  const fracFromClientX = useCallback((clientX: number) => {
+    const bar = barRef.current;
+    if (!bar) return null;
+    const rect = bar.getBoundingClientRect();
+    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+  }, []);
+
+  // ── Pointer drag (works for mouse + touch) ───────────────────────────────
+  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    draggingRef.current = true;
+    const frac = fracFromClientX(e.clientX);
+    if (frac !== null) { setDragFrac(frac); onSeekTo(frac); }
+  }, [fracFromClientX, onSeekTo]);
+
+  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    const frac = fracFromClientX(e.clientX);
+    if (frac !== null) { setDragFrac(frac); onSeekTo(frac); }
+  }, [fracFromClientX, onSeekTo]);
+
+  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    if (!draggingRef.current) return;
+    draggingRef.current = false;
+    const frac = fracFromClientX(e.clientX);
+    if (frac !== null) onSeekTo(frac);
+    setDragFrac(null);
+  }, [fracFromClientX, onSeekTo]);
+
+  // ── Keyboard seek ±5 s ───────────────────────────────────────────────────
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "ArrowRight") { e.preventDefault(); onSeekTo(Math.min(1, progress + 5 / totalSec)); }
+    if (e.key === "ArrowLeft")  { e.preventDefault(); onSeekTo(Math.max(0, progress - 5 / totalSec)); }
+  }, [onSeekTo, progress, totalSec]);
+
+  const displayFrac = dragFrac ?? progress;
   const playBtn = (
     <button
       type="button"
@@ -116,22 +159,63 @@ export default function PlayerControls({
   const progressRow = (
     <div className="flex items-center gap-2 w-full min-w-0">
       <span className="text-xs font-mono text-gray-600 shrink-0 w-9 text-right tabular-nums">
-        {fmt(progress * totalSec)}
+        {fmt(displayFrac * totalSec)}
       </span>
+
+      {/* Scrubber track */}
       <div
-        className="flex-1 h-2 md:h-1.5 bg-surface-3 rounded-full cursor-pointer relative overflow-hidden min-w-0 touch-manipulation"
-        onClick={onSeek}
+        ref={barRef}
+        className="group flex-1 relative flex items-center min-w-0 cursor-pointer touch-none select-none py-2"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+        onMouseMove={e => {
+          const frac = fracFromClientX(e.clientX);
+          if (!draggingRef.current && frac !== null) setHoverFrac(frac);
+        }}
+        onMouseLeave={() => setHoverFrac(null)}
+        onKeyDown={onKeyDown}
         role="slider"
+        tabIndex={0}
         aria-label="Playback position"
-        aria-valuenow={Math.round(progress * 100)}
+        aria-valuenow={Math.round(displayFrac * 100)}
         aria-valuemin={0}
         aria-valuemax={100}
       >
-        <div
-          className="absolute left-0 top-0 h-full bg-brand-500 rounded-full"
-          style={{ width: `${progress * 100}%` }}
-        />
+        {/* Track */}
+        <div className="w-full h-1.5 bg-surface-3 rounded-full overflow-visible relative">
+          {/* Fill */}
+          <div
+            className="absolute left-0 top-0 h-full bg-brand-500 rounded-full"
+            style={{ width: `${displayFrac * 100}%` }}
+          />
+          {/* Thumb */}
+          <div
+            className={clsx(
+              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 w-3.5 h-3.5 rounded-full bg-white shadow-md border-2 border-brand-500 transition-transform duration-100",
+              draggingRef.current ? "scale-125" : "scale-0 group-hover:scale-100",
+            )}
+            style={{ left: `${displayFrac * 100}%` }}
+          />
+        </div>
+
+        {/* Hover / drag time tooltip */}
+        {(hoverFrac !== null || dragFrac !== null) && (
+          <div
+            className="absolute -top-7 pointer-events-none z-50"
+            style={{
+              left: `${(dragFrac ?? hoverFrac ?? 0) * 100}%`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            <span className="bg-gray-800 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+              {fmt((dragFrac ?? hoverFrac ?? 0) * totalSec)}
+            </span>
+          </div>
+        )}
       </div>
+
       <span className="text-xs font-mono text-gray-600 shrink-0 w-9 tabular-nums">
         {fmt(totalSec)}
       </span>

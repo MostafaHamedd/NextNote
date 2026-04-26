@@ -20,6 +20,7 @@ export interface PlaybackHandle {
   handlePlay:      () => void;
   handleReset:     () => void;
   handleSeek:      (e: React.MouseEvent<HTMLDivElement>) => void;
+  handleSeekTo:    (frac: number) => void;
   setSpeed:        (s: Speed) => void;
   setSustainOn:    (v: boolean | ((prev: boolean) => boolean)) => void;
 }
@@ -195,11 +196,9 @@ export function usePianoPlayback(
   }, []);
 
   // ── Seek ──────────────────────────────────────────────────────────────────────
-  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const frac = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-    const sec  = frac * totalSecRef.current;
-    setProgress(frac);
+  const handleSeekTo = useCallback((frac: number) => {
+    const sec = Math.max(0, Math.min(1, frac)) * totalSecRef.current;
+    setProgress(Math.max(0, Math.min(1, frac)));
     if (playing) {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       startFrom(sec);
@@ -209,6 +208,11 @@ export function usePianoPlayback(
       setActiveNotes(activeNotesAtSec(sec));
     }
   }, [playing, startFrom, activeNotesAtSec]);
+
+  const handleSeek = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    handleSeekTo((e.clientX - rect.left) / rect.width);
+  }, [handleSeekTo]);
 
   // ── Restart when speed or sustain changes mid-play ───────────────────────────
   useEffect(() => {
@@ -229,6 +233,6 @@ export function usePianoPlayback(
 
   return {
     playing, progress, scoreTimeSec, speed, sustainOn, activeNotes,
-    handlePlay, handleReset, handleSeek, setSpeed, setSustainOn,
+    handlePlay, handleReset, handleSeek, handleSeekTo, setSpeed, setSustainOn,
   };
 }
