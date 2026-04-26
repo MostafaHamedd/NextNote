@@ -246,7 +246,7 @@ export default function LoginPage() {
 
           {/* Google OAuth */}
           <a
-            href={`${API_URL}/auth/google?fingerprint_id=${encodeURIComponent(fingerprintId)}`}
+            href={`${API_URL}/auth/google?fingerprint_id=${encodeURIComponent(fingerprintId)}&origin=${encodeURIComponent(typeof window !== "undefined" ? window.location.origin : "")}`}
             className="flex items-center justify-center gap-3 w-full py-3 rounded-xl border border-surface-border bg-surface-3 hover:bg-surface-2 transition-colors text-sm font-medium text-gray-200"
           >
             <svg width="18" height="18" viewBox="0 0 48 48" fill="none">
