@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { Play, Pause, RotateCcw, Loader2 } from "lucide-react";
 import clsx from "clsx";
 import { SPEEDS, Speed } from "@/hooks/usePianoPlayback";
@@ -37,47 +37,23 @@ export default function PlayerControls({
   speed, sustainOn, hasSustain,
   onPlay, onReset, onSeek, onSeekTo, onSpeedChange, onSustainToggle,
 }: Props) {
-  const barRef          = useRef<HTMLDivElement>(null);
-  const draggingRef     = useRef(false);
   const [isDragging, setIsDragging] = useState(false);
   const [dragFrac, setDragFrac]     = useState<number | null>(null);
-  const [hoverFrac, setHoverFrac]   = useState<number | null>(null);
 
-  const fracFromClientX = useCallback((clientX: number) => {
-    const bar = barRef.current;
-    if (!bar) return null;
-    const rect = bar.getBoundingClientRect();
-    return Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-  }, []);
+  const handleRangeChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const frac = parseInt(e.target.value) / 1000;
+    setDragFrac(frac);
+    onSeekTo(frac);
+  }, [onSeekTo]);
 
-  // ── Pointer drag (works for mouse + touch) ───────────────────────────────
-  const onPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    draggingRef.current = true;
-    setIsDragging(true);
-    const frac = fracFromClientX(e.clientX);
-    if (frac !== null) { setDragFrac(frac); onSeekTo(frac); }
-  }, [fracFromClientX, onSeekTo]);
+  const handleRangeStart = useCallback(() => setIsDragging(true), []);
 
-  const onPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) {
-      // Update hover tooltip on desktop
-      setHoverFrac(fracFromClientX(e.clientX));
-      return;
-    }
-    const frac = fracFromClientX(e.clientX);
-    if (frac !== null) { setDragFrac(frac); onSeekTo(frac); }
-  }, [fracFromClientX, onSeekTo]);
-
-  const onPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    if (!draggingRef.current) return;
-    draggingRef.current = false;
+  const handleRangeEnd = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const frac = parseInt(e.target.value) / 1000;
+    onSeekTo(frac);
     setIsDragging(false);
-    const frac = fracFromClientX(e.clientX);
-    if (frac !== null) onSeekTo(frac);
     setDragFrac(null);
-  }, [fracFromClientX, onSeekTo]);
+  }, [onSeekTo]);
 
   // ── Keyboard seek ±5 s ───────────────────────────────────────────────────
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -170,54 +146,51 @@ export default function PlayerControls({
         {fmt(displayFrac * totalSec)}
       </span>
 
-      {/* Scrubber track — tall hit area, pointer-capture drag, no onPointerLeave cancel */}
-      <div
-        ref={barRef}
-        className="flex-1 relative flex items-center min-w-0 cursor-pointer touch-none select-none py-3"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onMouseLeave={() => { if (!draggingRef.current) setHoverFrac(null); }}
-        onKeyDown={onKeyDown}
-        role="slider"
-        tabIndex={0}
-        aria-label="Playback position"
-        aria-valuenow={Math.round(displayFrac * 100)}
-        aria-valuemin={0}
-        aria-valuemax={100}
-      >
-        {/* Track */}
-        <div className="w-full h-1.5 bg-surface-3 rounded-full overflow-visible relative">
-          {/* Fill */}
+      {/* Scrubber — native range handles all mouse/touch/keyboard interaction */}
+      <div className="flex-1 relative flex items-center min-w-0" style={{ height: 28 }}>
+        {/* Visual track (decorative, pointer-events-none) */}
+        <div className="absolute left-0 right-0 top-1/2 -translate-y-1/2 h-1.5 bg-surface-3 rounded-full pointer-events-none">
           <div
             className="absolute left-0 top-0 h-full bg-brand-500 rounded-full"
             style={{ width: `${displayFrac * 100}%` }}
           />
-          {/* Thumb — always visible, scales up while dragging */}
           <div
             className={clsx(
-              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow-md border-2 border-brand-500 transition-transform duration-100",
-              isDragging ? "w-4 h-4 scale-125" : "w-3.5 h-3.5 scale-100",
+              "absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white border-2 border-brand-500 shadow transition-transform duration-100",
+              isDragging ? "w-4 h-4 scale-110" : "w-3.5 h-3.5",
             )}
             style={{ left: `${displayFrac * 100}%` }}
           />
         </div>
 
-        {/* Time tooltip while hovering or dragging */}
-        {(hoverFrac !== null || dragFrac !== null) && (
+        {/* Tooltip while dragging */}
+        {isDragging && (
           <div
             className="absolute -top-7 pointer-events-none z-50"
-            style={{
-              left: `${(dragFrac ?? hoverFrac ?? 0) * 100}%`,
-              transform: "translateX(-50%)",
-            }}
+            style={{ left: `${displayFrac * 100}%`, transform: "translateX(-50%)" }}
           >
             <span className="bg-gray-800 text-white text-[10px] font-mono px-1.5 py-0.5 rounded shadow whitespace-nowrap">
-              {fmt((dragFrac ?? hoverFrac ?? 0) * totalSec)}
+              {fmt(displayFrac * totalSec)}
             </span>
           </div>
         )}
+
+        {/* Native range input — fully transparent overlay, handles all interaction */}
+        <input
+          type="range"
+          min={0}
+          max={1000}
+          step={1}
+          value={Math.round(displayFrac * 1000)}
+          onChange={handleRangeChange}
+          onMouseDown={handleRangeStart}
+          onTouchStart={handleRangeStart}
+          onMouseUp={handleRangeEnd}
+          onTouchEnd={handleRangeEnd}
+          onKeyDown={onKeyDown}
+          aria-label="Playback position"
+          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+        />
       </div>
 
       <span className="text-xs font-mono text-gray-600 shrink-0 w-9 tabular-nums">
