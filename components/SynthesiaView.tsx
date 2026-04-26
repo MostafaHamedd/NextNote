@@ -10,9 +10,12 @@ import PlayerControls from "@/components/piano/PlayerControls";
 import FallingNotesLane from "@/components/piano/FallingNotesLane";
 import { AUTOPLAY_KEY } from "@/lib/auth";
 
+type HandFilter = "both" | "left" | "right";
+
 export default function SynthesiaView({ data }: { data: SheetData }) {
   const [showLane, setShowLane] = useState(true);
   const [tutorialDismissed, setTutorialDismissed] = useState(false);
+  const [handFilter, setHandFilter] = useState<HandFilter>("both");
   const autoPlayFiredRef = useRef(false);
 
   // Auto-dismiss tutorial hint after 4 s
@@ -29,13 +32,19 @@ export default function SynthesiaView({ data }: { data: SheetData }) {
     [data.notes],
   );
 
+  // Filter by selected hand (identity-stable so playback hook restarts cleanly)
+  const filteredNotes = useMemo(() =>
+    handFilter === "both" ? sortedNotes : sortedNotes.filter(n => n.hand === handFilter),
+    [sortedNotes, handFilter],
+  );
+
   const totalSec = data.totalSec > 0
     ? data.totalSec
     : Math.max(...sortedNotes.map(n => n.startSec + n.durationSec), 1);
 
   // ── Hooks ──────────────────────────────────────────────────────────────────
-  const sampler  = usePianoSampler(sortedNotes);
-  const playback = usePianoPlayback(sortedNotes, totalSec, data.hasSustainEvents ?? false, sampler);
+  const sampler  = usePianoSampler(sortedNotes);           // always load all samples
+  const playback = usePianoPlayback(filteredNotes, totalSec, data.hasSustainEvents ?? false, sampler);
 
   // ── Auto-play when sampler is ready (if setting enabled) ───────────────────
   useEffect(() => {
@@ -68,15 +77,31 @@ export default function SynthesiaView({ data }: { data: SheetData }) {
             {data.timeSignature} · {data.tempo} BPM · {Math.round(totalSec)}s
           </p>
         </div>
-        <div className="flex items-center gap-3 text-xs text-gray-500 shrink-0">
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-cyan-500 inline-block" />
-            Left hand
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="w-3 h-3 rounded-sm bg-brand-500 inline-block" />
-            Right hand
-          </span>
+        <div className="flex items-center gap-2 text-xs shrink-0">
+          {/* Hand filter buttons */}
+          {(["left", "both", "right"] as HandFilter[]).map((h) => (
+            <button
+              key={h}
+              onClick={() => setHandFilter(h)}
+              className={[
+                "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-all",
+                handFilter === h
+                  ? h === "left"
+                    ? "bg-cyan-500/20 border-cyan-500/60 text-cyan-300"
+                    : h === "right"
+                    ? "bg-brand-500/20 border-brand-500/60 text-brand-300"
+                    : "bg-white/10 border-white/30 text-white"
+                  : "bg-transparent border-surface-border text-gray-500 hover:text-gray-300 hover:border-gray-500",
+              ].join(" ")}
+            >
+              <span className={[
+                "w-2.5 h-2.5 rounded-sm inline-block",
+                h === "left"  ? "bg-cyan-500"   :
+                h === "right" ? "bg-brand-500"  : "bg-gradient-to-r from-cyan-500 to-brand-500",
+              ].join(" ")} />
+              {h === "both" ? "Both" : h === "left" ? "Left" : "Right"}
+            </button>
+          ))}
           {/* Falling-lane toggle with tutorial pulse */}
           <div className="relative ml-1">
             <button
@@ -113,7 +138,7 @@ export default function SynthesiaView({ data }: { data: SheetData }) {
         <div className="flex flex-col">
           {showLane && (
             <FallingNotesLane
-              sortedNotes={sortedNotes}
+              sortedNotes={filteredNotes}
               whiteKeys={whiteKeys}
               blackKeys={blackKeys}
               pianoW={pianoW}

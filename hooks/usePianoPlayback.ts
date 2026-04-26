@@ -57,6 +57,27 @@ export function usePianoPlayback(
   totalSecRef.current   = totalSec;
   sortedNotesRef.current = sortedNotes;
 
+  // ── Reset scheduler index when notes array identity changes (e.g. hand filter) ─
+  useEffect(() => {
+    // Recalculate correct start index for current playback position
+    const notes = sortedNotes;
+    const currentSec = secOffsetRef.current;
+    let idx = 0;
+    while (idx < notes.length && notes[idx].startSec < currentSec - 0.01) idx++;
+    nextSchedIdxRef.current = idx;
+
+    if (!playing) {
+      setActiveNotes(activeNotesAtSec(currentSec));
+      return;
+    }
+    // If playing, restart from current position with new note set
+    const elapsed = (performance.now() - playStartRef.current) / 1000;
+    const sec = secOffsetRef.current + elapsed * speedRef.current;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    startFrom(sec);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortedNotes]);
+
   // ── Active notes at a given position ────────────────────────────────────────
   const activeNotesAtSec = useCallback((currentSec: number) => {
     const notes  = sortedNotesRef.current;
