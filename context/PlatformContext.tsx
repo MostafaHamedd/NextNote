@@ -20,11 +20,11 @@ const DEFAULTS: PlatformConfig = {
   free_mode: false,
   producer_enabled: false,
   noise_removal_enabled: false,
-  visualizer_enabled: false,
-  live_detector_enabled: false,
-  ear_training_enabled: false,
-  guitar_piano_enabled: false,
-  logic_preset_enabled: false,
+  visualizer_enabled: true,
+  live_detector_enabled: true,
+  ear_training_enabled: true,
+  guitar_piano_enabled: true,
+  logic_preset_enabled: true,
 };
 
 const PlatformContext = createContext<PlatformConfig>(DEFAULTS);
