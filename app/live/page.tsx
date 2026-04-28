@@ -578,11 +578,14 @@ export default function LivePage() {
           <ArrowLeft size={16} />
           Back
         </Link>
-        <h1 className="text-lg font-semibold tracking-tight">Live Detector</h1>
+        <div>
+          <h1 className="text-lg font-semibold tracking-tight">Live Guitar Detector</h1>
+          <p className="text-xs text-[#5a5a70] leading-none mt-0.5">Real-time note & chord detection for guitar practice</p>
+        </div>
         {running && (
           <span className="ml-auto flex items-center gap-1.5 text-xs text-emerald-400">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            Live
+            Listening
           </span>
         )}
       </header>
@@ -615,6 +618,40 @@ export default function LivePage() {
             <Music2 size={16} />
             Chord
           </button>
+        </div>
+
+        {/* Setup banner */}
+        <div className="w-full rounded-xl border border-[#2e2e3e] bg-[#16161d] px-4 py-4 space-y-3">
+          <p className="text-xs font-semibold text-[#c0c0d8] flex items-center gap-2">
+            <Guitar size={13} className="text-indigo-400 shrink-0" />
+            How to connect your guitar
+          </p>
+          <div className="space-y-2.5 text-[11px] text-[#6a6a80]">
+            <div className="flex items-start gap-2.5">
+              <span className="text-indigo-400 font-bold shrink-0 mt-0.5">1.</span>
+              <span>
+                <span className="text-[#9999b0] font-medium">Acoustic guitar:</span>{" "}
+                just play near your computer mic — no setup needed. Hit Start and allow mic access when the browser asks.
+              </span>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <span className="text-indigo-400 font-bold shrink-0 mt-0.5">2.</span>
+              <span>
+                <span className="text-[#9999b0] font-medium">Electric guitar / audio interface:</span>{" "}
+                plug your guitar into your interface. When you hit Start, the browser will show a mic picker — select your interface from the dropdown instead of the built-in mic.
+              </span>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <span className="text-indigo-400 font-bold shrink-0 mt-0.5">3.</span>
+              <span>
+                <span className="text-[#9999b0] font-medium">DAW output (Logic, Ableton, etc.):</span>{" "}
+                install a virtual audio cable like <span className="text-[#9999b0]">BlackHole</span> or <span className="text-[#9999b0]">Loopback</span>, route your DAW output to it, then select it from the browser mic picker when you hit Start.
+              </span>
+            </div>
+          </div>
+          <p className="text-[10px] text-[#4a4a60] border-t border-[#1e1e2a] pt-2.5">
+            💡 The browser mic picker appears automatically when you press Start — look for the small dropdown at the top of the permission prompt to switch input sources.
+          </p>
         </div>
 
         {/* Hint */}
@@ -817,7 +854,7 @@ export default function LivePage() {
         )}
 
         <p className="text-xs text-[#5a5a70] text-center">
-          Best in Chrome or Firefox — Safari may have microphone quirks.
+          Best in Chrome or Firefox · works with acoustic, electric, or DAW output · use a clean tone for best results
         </p>
 
         <TheoryCorner />
