@@ -75,15 +75,23 @@ function Piano({
   highlighted = [],
   readonly = false,
   onKey,
+  full = false,
 }: {
   active: number | null;
   highlighted?: number[];
   readonly?: boolean;
   onKey: (s: number) => void;
+  full?: boolean;
 }) {
   const svgW = WW * 7;
   return (
-    <svg viewBox={`0 0 ${svgW} ${WH}`} width={svgW} height={WH} aria-label="Piano keyboard">
+    <svg
+      viewBox={`0 0 ${svgW} ${WH}`}
+      {...(full
+        ? { style: { width: "100%", height: "auto", display: "block" } }
+        : { width: svgW, height: WH })}
+      aria-label="Piano keyboard"
+    >
       {/* White keys */}
       {WHITE_SEMITONES.map((s, i) => {
         const isActive   = s === active;
@@ -481,7 +489,10 @@ export default function EarTrainingPage() {
 
         {/* ── Practice Phase ────────────────────────────────────────────────── */}
         {phase === "practice" && (
-          <div className="flex flex-col lg:flex-row gap-6 w-full max-w-3xl mx-auto items-start">
+          <div className="flex flex-col gap-6 w-full">
+
+            {/* Top section: quiz + note pool side-by-side on desktop */}
+            <div className="flex flex-col lg:flex-row gap-6 w-full max-w-5xl mx-auto">
 
             {/* ── Left: quiz column ── */}
             <div className="flex-1 flex flex-col gap-6 min-w-0">
@@ -607,17 +618,6 @@ export default function EarTrainingPage() {
                   </p>
                 )}
               </div>
-
-              {/* Reference keyboard — play any note to refresh your memory */}
-              <div className="flex flex-col gap-2">
-                <p className="text-xs text-[#4a4a60]">Play any note</p>
-                <div className="overflow-x-auto">
-                  <Piano
-                    active={null}
-                    onKey={(s) => synth(s, getCtx())}
-                  />
-                </div>
-              </div>
             </div>
 
             {/* ── Right: note pool picker ── */}
@@ -717,6 +717,18 @@ export default function EarTrainingPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            </div>{/* end top section */}
+
+            {/* Full-width reference piano */}
+            <div className="flex flex-col gap-2 w-full">
+              <p className="text-xs text-[#4a4a60] px-1">Play any note</p>
+              <Piano
+                full
+                active={null}
+                onKey={(s) => synth(s, getCtx())}
+              />
             </div>
 
           </div>

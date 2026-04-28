@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { API_URL } from "@/lib/config";
 
 interface PlatformConfig {
+  loaded: boolean;
   free_mode: boolean;
   producer_enabled: boolean;
   noise_removal_enabled: boolean;
@@ -11,16 +12,19 @@ interface PlatformConfig {
   live_detector_enabled: boolean;
   ear_training_enabled: boolean;
   guitar_piano_enabled: boolean;
+  logic_preset_enabled: boolean;
 }
 
 const DEFAULTS: PlatformConfig = {
+  loaded: false,
   free_mode: false,
-  producer_enabled: true,
+  producer_enabled: false,
   noise_removal_enabled: false,
-  visualizer_enabled: true,
-  live_detector_enabled: true,
-  ear_training_enabled: true,
-  guitar_piano_enabled: true,
+  visualizer_enabled: false,
+  live_detector_enabled: false,
+  ear_training_enabled: false,
+  guitar_piano_enabled: false,
+  logic_preset_enabled: false,
 };
 
 const PlatformContext = createContext<PlatformConfig>(DEFAULTS);
@@ -31,8 +35,8 @@ export function PlatformProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     fetch(`${API_URL}/config`)
       .then((r) => r.ok ? r.json() : null)
-      .then((data) => { if (data) setConfig({ ...DEFAULTS, ...data }); })
-      .catch(() => {});
+      .then((data) => { setConfig({ ...DEFAULTS, loaded: true, ...(data ?? {}) }); })
+      .catch(() => { setConfig({ ...DEFAULTS, loaded: true }); });
   }, []);
 
   return (

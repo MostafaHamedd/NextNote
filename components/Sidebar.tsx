@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogIn, Zap, Library, Wand2, Radio, Headphones, Filter, Crown, LayoutGrid, PenLine } from "lucide-react";
+import { LogIn, Zap, Library, Wand2, Radio, Headphones, Filter, Crown, LayoutGrid, PenLine, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import HistorySidebar from "@/components/HistorySidebar";
@@ -21,6 +21,7 @@ const TOOLS = [
   { href: "/live",           label: "Live Detector",    icon: Radio,     activeOn: ["/live"],                 flagKey: "live_detector_enabled" },
   { href: "/ear-training",   label: "Ear Training",     icon: Headphones, activeOn: ["/ear-training"],       flagKey: "ear_training_enabled"  },
   { href: "/noise-removal",  label: "Noise Removal",    icon: Filter,    activeOn: ["/noise-removal"],        flagKey: "noise_removal_enabled" },
+  { href: "/logic-preset",   label: "Logic Presets",    icon: Sparkles,  activeOn: ["/logic-preset"],         flagKey: "logic_preset_enabled"  },
 ] as const;
 
 export default function Sidebar() {
@@ -100,7 +101,7 @@ export default function Sidebar() {
           </div>
 
           {TOOLS.map(({ href, label, icon: Icon, activeOn, flagKey }) => {
-            if (!platform[flagKey]) return null;
+            if (!platform.loaded || !platform[flagKey]) return null;
             const isActive = (activeOn as readonly string[]).includes(pathname);
             return (
               <Link
@@ -120,7 +121,7 @@ export default function Sidebar() {
           })}
 
           {/* ACCOUNT section */}
-          {!free_mode && (
+          {platform.loaded && !free_mode && (
             <>
               <div className="pt-4 pb-1.5 px-3">
                 <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-widest">Account</p>
@@ -146,7 +147,7 @@ export default function Sidebar() {
           <UserMenu />
         ) : (
           <div className="px-2 py-3 border-t border-surface-border shrink-0 space-y-1">
-            {!free_mode && freeUsed < MAX_FREE_ATTEMPTS && (
+            {platform.loaded && !free_mode && freeUsed < MAX_FREE_ATTEMPTS && (
               <div className="px-3 py-2">
                 <div className="flex justify-between text-[10px] text-gray-500 mb-1">
                   <span>Free uses</span>

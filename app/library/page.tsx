@@ -316,10 +316,35 @@ function EmptyState({ message, sub, href, cta, icon: Icon }: {
 }
 
 function SessionActions({ onDelete }: { onDelete: () => void }) {
+  const [confirming, setConfirming] = useState(false);
+
+  if (confirming) {
+    return (
+      <div
+        className="flex items-center gap-2 shrink-0"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <span className="text-xs text-gray-500 hidden sm:inline">Delete?</span>
+        <button
+          onClick={() => { onDelete(); setConfirming(false); }}
+          className="text-xs px-2.5 py-1 rounded-lg bg-red-500 hover:bg-red-400 text-white font-semibold transition-all"
+        >
+          Yes
+        </button>
+        <button
+          onClick={() => setConfirming(false)}
+          className="text-xs px-2.5 py-1 rounded-lg bg-surface-3 hover:bg-surface-border text-gray-400 hover:text-white font-medium transition-all"
+        >
+          No
+        </button>
+      </div>
+    );
+  }
+
   return (
-    <div className="flex items-center gap-1 shrink-0">
+    <div className="flex items-center gap-4 shrink-0">
       <button
-        onClick={(e) => { e.stopPropagation(); onDelete(); }}
+        onClick={(e) => { e.stopPropagation(); setConfirming(true); }}
         className="p-2 rounded-lg text-gray-600 hover:text-red-400 hover:bg-red-500/10 transition-all opacity-0 group-hover:opacity-100"
         title="Delete"
       >
