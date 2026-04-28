@@ -721,14 +721,16 @@ export default function EarTrainingPage() {
 
             </div>{/* end top section */}
 
-            {/* Full-width reference piano */}
+            {/* Reference piano — full width on mobile, capped on desktop */}
             <div className="flex flex-col gap-2 w-full">
               <p className="text-xs text-[#4a4a60] px-1">Play any note</p>
-              <Piano
-                full
-                active={null}
-                onKey={(s) => synth(s, getCtx())}
-              />
+              <div className="w-full lg:max-w-xl">
+                <Piano
+                  full
+                  active={null}
+                  onKey={(s) => synth(s, getCtx())}
+                />
+              </div>
             </div>
 
           </div>
