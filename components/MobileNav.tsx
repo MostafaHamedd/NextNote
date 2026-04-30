@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   Home, LogIn, Library, Menu, X, Zap,
   Wand2, Radio, Headphones, Filter, Crown,
-  LayoutGrid, PenLine, Sparkles,
+  LayoutGrid, PenLine, Sparkles, Mail,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import clsx from "clsx";
@@ -244,6 +244,21 @@ export default function MobileNav() {
               </Link>
             </>
           )}
+
+          {/* Contact */}
+          <Link
+            href="/contact"
+            onClick={() => setDrawerOpen(false)}
+            className={clsx(
+              "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
+              pathname === "/contact"
+                ? "bg-brand-600/20 text-white"
+                : "text-gray-400 hover:text-white hover:bg-surface-3"
+            )}
+          >
+            <Mail size={14} />
+            Contact Us
+          </Link>
         </nav>
 
         {/* Bottom: user menu or sign-in + free uses */}

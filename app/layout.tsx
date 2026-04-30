@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
+import Footer from "@/components/Footer";
 import ClientProviders from "@/components/ClientProviders";
 
 export const metadata: Metadata = {
@@ -23,8 +24,9 @@ export default function RootLayout({
       <body className="flex min-h-screen bg-surface overflow-x-hidden">
         <ClientProviders>
           <Sidebar />
-          <div className="flex-1 md:ml-44 ml-0 min-w-0 overflow-x-hidden pb-16 md:pb-0">
-            {children}
+          <div className="flex-1 md:ml-44 ml-0 min-w-0 overflow-x-hidden pb-16 md:pb-0 flex flex-col">
+            <div className="flex-1">{children}</div>
+            <Footer />
           </div>
           <MobileNav />
         </ClientProviders>

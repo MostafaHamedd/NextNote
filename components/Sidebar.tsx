@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LogIn, Zap, Library, Wand2, Radio, Headphones, Filter, Crown, LayoutGrid, PenLine, Sparkles } from "lucide-react";
+import { LogIn, Zap, Library, Wand2, Radio, Headphones, Filter, Crown, LayoutGrid, PenLine, Sparkles, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import clsx from "clsx";
 import HistorySidebar from "@/components/HistorySidebar";
@@ -140,6 +140,20 @@ export default function Sidebar() {
               </Link>
             </>
           )}
+
+          {/* Contact */}
+          <Link
+            href="/contact"
+            className={clsx(
+              "flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-sm font-medium transition-all",
+              pathname === "/contact"
+                ? "bg-brand-600/20 text-white"
+                : "text-gray-400 hover:text-white hover:bg-surface-3"
+            )}
+          >
+            <Mail size={14} />
+            Contact Us
+          </Link>
         </nav>
 
         {/* Bottom: user menu or sign-in */}
