@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -9,7 +9,7 @@ import { sheetStore, SheetData } from "@/lib/sheetStore";
 import { authHeaders } from "@/lib/auth";
 import { API_URL } from "@/lib/config";
 
-export default function VisualizerPlayPage() {
+function VisualizerPlayInner() {
   const router       = useRouter();
   const searchParams = useSearchParams();
   const [data, setData]       = useState<SheetData | null>(null);
@@ -89,5 +89,13 @@ export default function VisualizerPlayPage() {
         <SynthesiaView data={data} />
       </div>
     </div>
+  );
+}
+
+export default function VisualizerPlayPage() {
+  return (
+    <Suspense>
+      <VisualizerPlayInner />
+    </Suspense>
   );
 }

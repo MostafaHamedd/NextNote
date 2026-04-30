@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -10,7 +10,7 @@ import { API_URL } from "@/lib/config";
 const POLL_INTERVAL_MS = 1500;
 const POLL_MAX_ATTEMPTS = 10; // fallback polling: 15 seconds total
 
-export default function BillingSuccessPage() {
+function BillingSuccessInner() {
   const { user, refreshProfile } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
@@ -147,5 +147,13 @@ export default function BillingSuccessPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function BillingSuccessPage() {
+  return (
+    <Suspense>
+      <BillingSuccessInner />
+    </Suspense>
   );
 }
