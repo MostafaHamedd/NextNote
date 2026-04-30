@@ -24,7 +24,7 @@ const DEFAULTS: PlatformConfig = {
   live_detector_enabled: true,
   ear_training_enabled: true,
   guitar_piano_enabled: true,
-  logic_preset_enabled: true,
+  logic_preset_enabled: false,
 };
 
 const PlatformContext = createContext<PlatformConfig>(DEFAULTS);
