@@ -9,6 +9,7 @@ import ProducerResult, { type ProducerData } from "@/components/ProducerResult";
 import { authHeaders } from "@/lib/auth";
 import { useFreeAttempts } from "@/hooks/useFreeAttempts";
 import { usePlatform } from "@/context/PlatformContext";
+import { useAuth } from "@/context/AuthContext";
 import { API_URL } from "@/lib/config";
 
 type Grid = "1/8" | "1/16";
@@ -19,6 +20,7 @@ function ProducerPageInner() {
   const isAnon = searchParams.get("anon") === "1";
 
   const { producer_enabled } = usePlatform();
+  const { user } = useAuth();
   const { remaining, checkAccess, recordUsage } = useFreeAttempts();
 
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -142,7 +144,7 @@ function ProducerPageInner() {
             and a downloadable MIDI melody line ready to drag into Logic Pro.
           </p>
 
-          {!free_mode && remaining !== null && remaining > 0 && (
+          {!user && remaining !== null && remaining > 0 && (
             <div className="inline-flex items-center gap-2 mt-4 bg-surface-3/60 border border-surface-border rounded-full px-4 py-1.5">
               <span className="text-xs text-gray-400">
                 {remaining} free {remaining === 1 ? "analysis" : "analyses"} remaining —{" "}
