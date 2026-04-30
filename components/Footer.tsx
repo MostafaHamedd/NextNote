@@ -21,9 +21,9 @@ export default function Footer() {
         </div>
 
         {/* Watermark */}
-        <p className="text-xs text-gray-600">
+        <p className="text-xs text-gray-400">
           Developed by{" "}
-          <span className="text-gray-400 font-medium">Mostafa Hamed</span>
+          <span className="text-white font-semibold">Mostafa Hamed</span>
         </p>
       </div>
     </footer>

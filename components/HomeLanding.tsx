@@ -226,6 +226,11 @@ export default function HomeLanding() {
         </section>
 
       </div>
+
+      {/* Watermark */}
+      <p className="text-center text-xs text-gray-400 py-6">
+        Developed by <span className="text-white font-semibold">Mostafa Hamed</span>
+      </p>
     </div>
   );
 }
