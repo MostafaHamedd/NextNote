@@ -48,8 +48,8 @@ export default function PlayerControls({
 
   const handleRangeStart = useCallback(() => setIsDragging(true), []);
 
-  const handleRangeEnd = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const frac = parseInt(e.target.value) / 1000;
+  const handleRangeEnd = useCallback((e: React.SyntheticEvent<HTMLInputElement>) => {
+    const frac = parseInt((e.target as HTMLInputElement).value) / 1000;
     onSeekTo(frac);
     setIsDragging(false);
     setDragFrac(null);
